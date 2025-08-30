@@ -296,6 +296,12 @@ Table above shows the content of `listing_sf`. Notice that a new column called�
 
 ## DIY
 
+```{r}
+plot(st_geometry(mpsz))
+plot(st_geometry(listings_sf), 
+     add = TRUE)
+```
+
 # 9 **Geoprocessing with sf package**
 
 Besides providing functions to handling (i.e. importing, exporting, assigning projection, transforming projection etc) geospatial data, **sf** package also offers a wide range of geoprocessing (also known as GIS analysis) functions.
@@ -350,6 +356,117 @@ mpsz_selected <- mpsz %>%
 Next, `st_intersection()` of **sf** package will be used to clip cycling buffers within Tampines West planning subzone.
 
 ```{r}
-buffer_cycling_selected <- st_intersection(
-  buffer_cycling, mpsz_selected)
+library(sf)
+
+# 1) Inspect CRS
+st_crs(buffer_cycling)
+st_crs(mpsz_selected)
+
+# 2) Pick a common *projected* CRS (for Singapore use SVY21)
+target_crs <- 3414  # EPSG:3414
+
+# If either object shows NA for CRS but you KNOW what it should be, set it (no reprojection):
+# buffer_cycling <- st_set_crs(buffer_cycling, 4326)  # only if you're certain!
+# mpsz_selected  <- st_set_crs(mpsz_selected, 3414)   # only if you're certain!
+
+# 3) Reproject both
+buffer_cycling <- st_transform(buffer_cycling, target_crs)
+mpsz_selected  <- st_transform(mpsz_selected,  target_crs)
+
+# 4) (Recommended) If you created buffer before reprojection, redo it now in meters
+# e.g., 500 m buffer:
+# points_or_lines <- ...
+# buffer_cycling <- st_buffer(points_or_lines, dist = 500)
+
+# 5) Clean geometry issues
+buffer_cycling <- st_make_valid(buffer_cycling) |> st_zm(drop = TRUE)
+mpsz_selected  <- st_make_valid(mpsz_selected)  |> st_zm(drop = TRUE)
+
+# 6) Intersect
+buffer_cycling_selected <- st_intersection(buffer_cycling, mpsz_selected)
+```
+
+Lastly, plot() of R Graphic will be used to create the plot as shown below.
+
+```{r}
+plot(st_geometry(buffer_cycling_selected))
+```
+
+## 9.2 **Use case 2: To determine the number of pre-schools by planning subzone**
+
+### 9.2.1 The scenario
+
+The authority requires a count of pre-schools for each planning subzone to support forward planning. Using R and the sf package, perform the necessary geoprocessing to compute these counts and present the results clearly.
+
+### 9.2.2 The solution
+
+The code chunk below performs two operations at one go. Firstly, identify pre-schools located inside each Planning Subzone by using [`st_intersects()`](https://r-spatial.github.io/sf/reference/geos_binary_pred.html). Next, [`length()`](https://www.rdocumentation.org/packages/base/versions/3.6.2/topics/length) of Base R is used to calculate numbers of pre-schools that fall inside each planning subzone.
+
+```{r}
+mpsz$`PreSch Count`<- lengths(st_intersects(mpsz, preschool))
+```
+
+You can check the summary statistics of the newly derived *PreSch Count* field by using *summary()* as shown in the code chunk below.
+
+```{r}
+summary(mpsz$`PreSch Count`)
+```
+
+To list the planning subzone with the most number of pre-school, the [*top_n()*](https://dplyr.tidyverse.org/reference/top_n.html) of **dplyr** package is used as shown in the code chunk below.
+
+```{r}
+top_n(mpsz, 1, `PreSch Count`)
+```
+
+In the code chunk below, another geoprocessing function of sf package called [`st_area()`](https://r-spatial.github.io/sf/reference/geos_measures.html) is used to derive the area of each planning subzone.
+
+```{r}
+mpsz$Area <- mpsz %>%
+  st_area()
+```
+
+Next, [*mutate()*](https://dplyr.tidyverse.org/reference/mutate.html) of [**dplyr**](https://dplyr.tidyverse.org/) package is used to compute the density by using the code chunk below.
+
+```{r}
+mpsz <- mpsz %>%
+  mutate(`PreSch Density` = `PreSch Count`/Area * 1000000)
+```
+
+In this section, you will visualise the derive variables by using appropriate Exploratory data Analysis methods of [ggplot2](https://ggplot2.tidyverse.org/).
+
+Firstly, we will plot a histogram to reveal the distribution of `PreSch Density`. Conventionally, *hist()* of R Graphics will be used as shown in the code chunk below.
+
+```{r}
+hist(mpsz$`PreSch Density`)
+```
+
+Although the syntax is very easy to use however the output is far from meeting publication quality. Furthermore, the function has limited room for further customisation.
+
+In the code chunk below, appropriate **ggplot2** functions will be used.
+
+```{r}
+ggplot(data=mpsz, 
+       aes(x= as.numeric(`PreSch Density`)))+
+  geom_histogram(bins=20, 
+                 color="black", 
+                 fill="light blue") +
+  labs(title = "Are pre-school even distributed in Singapore?",
+       subtitle= "There are many planning subzones with a single pre-school, on the other hand, \nthere are seven planning subzones with at least 30 or more pre-schools",
+      x = "Pre-school density (per km sq)",
+      y = "Frequency")
+```
+
+In the code chunk below, appropriate ggplot2 functions are used to plot a scatterplot showing the relationship between Pre-school Density and Pre-school Count.
+
+```{r}
+ggplot(data=mpsz, 
+       aes(y = `PreSch Count`, 
+           x= as.numeric(`PreSch Density`)))+
+  geom_point(color="black", 
+             fill="light blue") +
+  xlim(0, 40) +
+  ylim(0, 40) +
+  labs(title = "",
+      x = "Pre-school density (per km sq)",
+      y = "Pre-school count")
 ```
