@@ -887,27 +887,18 @@ PROJCRS["SVY21 / Singapore TM",
     ID["EPSG",3414]]</code></pre>
 </div>
 <div class="sourceCode cell-code" id="cb42"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb42-1"><a href="#cb42-1" aria-hidden="true" tabindex="-1"></a><span class="co"># 2) Pick a common *projected* CRS (for Singapore use SVY21)</span></span>
-<span id="cb42-2"><a href="#cb42-2" aria-hidden="true" tabindex="-1"></a>target_crs <span class="ot">&lt;-</span> <span class="dv">3414</span>  <span class="co"># EPSG:3414</span></span>
+<span id="cb42-2"><a href="#cb42-2" aria-hidden="true" tabindex="-1"></a>target_crs <span class="ot">&lt;-</span> <span class="dv">3414</span>  <span class="co"># EPSG:341</span></span>
 <span id="cb42-3"><a href="#cb42-3" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb42-4"><a href="#cb42-4" aria-hidden="true" tabindex="-1"></a><span class="co"># If either object shows NA for CRS but you KNOW what it should be, set it (no reprojection):</span></span>
-<span id="cb42-5"><a href="#cb42-5" aria-hidden="true" tabindex="-1"></a><span class="co"># buffer_cycling &lt;- st_set_crs(buffer_cycling, 4326)  # only if you're certain!</span></span>
-<span id="cb42-6"><a href="#cb42-6" aria-hidden="true" tabindex="-1"></a><span class="co"># mpsz_selected  &lt;- st_set_crs(mpsz_selected, 3414)   # only if you're certain!</span></span>
+<span id="cb42-4"><a href="#cb42-4" aria-hidden="true" tabindex="-1"></a><span class="co"># 3) Reproject both</span></span>
+<span id="cb42-5"><a href="#cb42-5" aria-hidden="true" tabindex="-1"></a>buffer_cycling <span class="ot">&lt;-</span> <span class="fu">st_transform</span>(buffer_cycling, target_crs)</span>
+<span id="cb42-6"><a href="#cb42-6" aria-hidden="true" tabindex="-1"></a>mpsz_selected  <span class="ot">&lt;-</span> <span class="fu">st_transform</span>(mpsz_selected,  target_crs)</span>
 <span id="cb42-7"><a href="#cb42-7" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb42-8"><a href="#cb42-8" aria-hidden="true" tabindex="-1"></a><span class="co"># 3) Reproject both</span></span>
-<span id="cb42-9"><a href="#cb42-9" aria-hidden="true" tabindex="-1"></a>buffer_cycling <span class="ot">&lt;-</span> <span class="fu">st_transform</span>(buffer_cycling, target_crs)</span>
-<span id="cb42-10"><a href="#cb42-10" aria-hidden="true" tabindex="-1"></a>mpsz_selected  <span class="ot">&lt;-</span> <span class="fu">st_transform</span>(mpsz_selected,  target_crs)</span>
+<span id="cb42-8"><a href="#cb42-8" aria-hidden="true" tabindex="-1"></a><span class="co"># 4) Clean geometry issues</span></span>
+<span id="cb42-9"><a href="#cb42-9" aria-hidden="true" tabindex="-1"></a>buffer_cycling <span class="ot">&lt;-</span> <span class="fu">st_make_valid</span>(buffer_cycling) <span class="sc">|&gt;</span> <span class="fu">st_zm</span>(<span class="at">drop =</span> <span class="cn">TRUE</span>)</span>
+<span id="cb42-10"><a href="#cb42-10" aria-hidden="true" tabindex="-1"></a>mpsz_selected  <span class="ot">&lt;-</span> <span class="fu">st_make_valid</span>(mpsz_selected)  <span class="sc">|&gt;</span> <span class="fu">st_zm</span>(<span class="at">drop =</span> <span class="cn">TRUE</span>)</span>
 <span id="cb42-11"><a href="#cb42-11" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb42-12"><a href="#cb42-12" aria-hidden="true" tabindex="-1"></a><span class="co"># 4) (Recommended) If you created buffer before reprojection, redo it now in meters</span></span>
-<span id="cb42-13"><a href="#cb42-13" aria-hidden="true" tabindex="-1"></a><span class="co"># e.g., 500 m buffer:</span></span>
-<span id="cb42-14"><a href="#cb42-14" aria-hidden="true" tabindex="-1"></a><span class="co"># points_or_lines &lt;- ...</span></span>
-<span id="cb42-15"><a href="#cb42-15" aria-hidden="true" tabindex="-1"></a><span class="co"># buffer_cycling &lt;- st_buffer(points_or_lines, dist = 500)</span></span>
-<span id="cb42-16"><a href="#cb42-16" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb42-17"><a href="#cb42-17" aria-hidden="true" tabindex="-1"></a><span class="co"># 5) Clean geometry issues</span></span>
-<span id="cb42-18"><a href="#cb42-18" aria-hidden="true" tabindex="-1"></a>buffer_cycling <span class="ot">&lt;-</span> <span class="fu">st_make_valid</span>(buffer_cycling) <span class="sc">|&gt;</span> <span class="fu">st_zm</span>(<span class="at">drop =</span> <span class="cn">TRUE</span>)</span>
-<span id="cb42-19"><a href="#cb42-19" aria-hidden="true" tabindex="-1"></a>mpsz_selected  <span class="ot">&lt;-</span> <span class="fu">st_make_valid</span>(mpsz_selected)  <span class="sc">|&gt;</span> <span class="fu">st_zm</span>(<span class="at">drop =</span> <span class="cn">TRUE</span>)</span>
-<span id="cb42-20"><a href="#cb42-20" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb42-21"><a href="#cb42-21" aria-hidden="true" tabindex="-1"></a><span class="co"># 6) Intersect</span></span>
-<span id="cb42-22"><a href="#cb42-22" aria-hidden="true" tabindex="-1"></a>buffer_cycling_selected <span class="ot">&lt;-</span> <span class="fu">st_intersection</span>(buffer_cycling, mpsz_selected)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb42-12"><a href="#cb42-12" aria-hidden="true" tabindex="-1"></a><span class="co"># 5) Intersect</span></span>
+<span id="cb42-13"><a href="#cb42-13" aria-hidden="true" tabindex="-1"></a>buffer_cycling_selected <span class="ot">&lt;-</span> <span class="fu">st_intersection</span>(buffer_cycling, mpsz_selected)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 <p>Lastly, plot() of R Graphic will be used to create the plot as shown below.</p>
 <div class="cell">

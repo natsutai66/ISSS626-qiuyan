@@ -363,26 +363,17 @@ st_crs(buffer_cycling)
 st_crs(mpsz_selected)
 
 # 2) Pick a common *projected* CRS (for Singapore use SVY21)
-target_crs <- 3414  # EPSG:3414
-
-# If either object shows NA for CRS but you KNOW what it should be, set it (no reprojection):
-# buffer_cycling <- st_set_crs(buffer_cycling, 4326)  # only if you're certain!
-# mpsz_selected  <- st_set_crs(mpsz_selected, 3414)   # only if you're certain!
+target_crs <- 3414  # EPSG:341
 
 # 3) Reproject both
 buffer_cycling <- st_transform(buffer_cycling, target_crs)
 mpsz_selected  <- st_transform(mpsz_selected,  target_crs)
 
-# 4) (Recommended) If you created buffer before reprojection, redo it now in meters
-# e.g., 500 m buffer:
-# points_or_lines <- ...
-# buffer_cycling <- st_buffer(points_or_lines, dist = 500)
-
-# 5) Clean geometry issues
+# 4) Clean geometry issues
 buffer_cycling <- st_make_valid(buffer_cycling) |> st_zm(drop = TRUE)
 mpsz_selected  <- st_make_valid(mpsz_selected)  |> st_zm(drop = TRUE)
 
-# 6) Intersect
+# 5) Intersect
 buffer_cycling_selected <- st_intersection(buffer_cycling, mpsz_selected)
 ```
 
