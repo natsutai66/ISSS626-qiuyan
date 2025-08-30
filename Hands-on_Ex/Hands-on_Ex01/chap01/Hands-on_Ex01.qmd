@@ -230,7 +230,7 @@ preschool <- st_transform(preschool,
 
 Next, let us display the content of preschool sf data frame as shown below.
 
-![](images/clipboard-1919023867.png){width="644"}
+![](images/clipboard-1919023867.png){width="617"}
 
 Notice that it is in svy21 projected coordinate system now. Furthermore, if you refer to *Bounding box:*, the values are greater than 0-360 range of decimal degree commonly used by most of the geographic coordinate systems.
 
