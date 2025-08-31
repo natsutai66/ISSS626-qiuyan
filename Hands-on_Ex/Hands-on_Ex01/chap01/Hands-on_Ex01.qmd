@@ -107,7 +107,8 @@ The code chunk below uses *st_read()* function of **sf** package to import 
 
 ```{r}
 cyclingpath = st_read(dsn = "data/geospatial", 
-                         layer = "CyclingPathGazette")
+                         layer = "CyclingPathGazette") %>%
+  st_transform(crs=3414)
 
 ```
 
@@ -230,8 +231,6 @@ preschool <- st_transform(preschool,
 
 Next, let us display the content of preschool sf data frame as shown below.
 
-![](images/clipboard-1919023867.png){width="617"}
-
 Notice that it is in svy21 projected coordinate system now. Furthermore, if you refer to *Bounding box:*, the values are greater than 0-360 range of decimal degree commonly used by most of the geographic coordinate systems.
 
 Now, let us try to plot the preschool layer ontop of mpsz layer again by using the similar code chunk you used earlier.
@@ -350,31 +349,14 @@ Firstly, `filter()` of dplyr package will be used to extract polygon feature of 
 
 ```{r}
 mpsz_selected <- mpsz %>%
-  filter(SUBZONE_N == "TAMPINES WEST") 
+  filter(SUBZONE_N == "TAMPINES WEST")
 ```
 
 Next, `st_intersection()` of **sf** package will be used to clip cycling buffers within Tampines West planning subzone.
 
 ```{r}
-library(sf)
-
-# 1) Inspect CRS
-st_crs(buffer_cycling)
-st_crs(mpsz_selected)
-
-# 2) Pick a common *projected* CRS (for Singapore use SVY21)
-target_crs <- 3414  # EPSG:341
-
-# 3) Reproject both
-buffer_cycling <- st_transform(buffer_cycling, target_crs)
-mpsz_selected  <- st_transform(mpsz_selected,  target_crs)
-
-# 4) Clean geometry issues
-buffer_cycling <- st_make_valid(buffer_cycling) |> st_zm(drop = TRUE)
-mpsz_selected  <- st_make_valid(mpsz_selected)  |> st_zm(drop = TRUE)
-
-# 5) Intersect
-buffer_cycling_selected <- st_intersection(buffer_cycling, mpsz_selected)
+buffer_cycling_selected <- st_intersection(
+  buffer_cycling, mpsz_selected)
 ```
 
 Lastly, plot() of R Graphic will be used to create the plot as shown below.
