@@ -72,7 +72,7 @@ extract_kml_field <- function(html_text, field_name) {
   if (length(value) == 0) NA_character_ else value
 }
 
-# --- 1) Subzones (SVY21, metres) -------------------------------------------
+# 1) Subzones (SVY21, metres)
 mpsz_sf <- sf::st_read(kml_mpsz) %>%
   sf::st_zm(drop = TRUE, what = "ZM") %>%
   sf::st_transform(crs = 3414) %>%
@@ -93,22 +93,22 @@ mpsz_cl <- mpsz_sf %>%
     PLN_AREA_N != "NORTH-EASTERN ISLANDS"
   )
 
-# --- 2) Childcare points (SVY21, metres) ------------------------------------
+# 2) Childcare points (SVY21, metres)
 childcare_sf <- sf::st_read(kml_child) %>%
   sf::st_zm(drop = TRUE, what = "ZM") %>%
   sf::st_transform(crs = 3414) %>%
   dplyr::filter(!sf::st_is_empty(geometry))  # guard against empties
 
-# --- 3) Convert to spatstat & enforce simple point pattern -------------------
+# 3) Convert to spatstat & enforce simple point pattern
 childcare_ppp <- spatstat.geom::as.ppp(childcare_sf)
 spatstat.geom::unitname(childcare_ppp) <- "metre"        # explicit unit
 childcare_ppp <- spatstat.geom::unique.ppp(childcare_ppp) # remove duplicates
 
-# --- 4) Clip to Singapore window --------------------------------------------
+# 4) Clip to Singapore window
 sg_owin        <- spatstat.geom::as.owin(mpsz_cl)
 childcareSG_ppp <- childcare_ppp[sg_owin]
 
-# --- 5) Planning-area subsets (subset AFTER clip & de-dup) -------------------
+# 5) Planning-area subsets (subset AFTER clip & de-dup)
 pg_owin <- spatstat.geom::as.owin(dplyr::filter(mpsz_cl, PLN_AREA_N == "PUNGGOL"))
 tm_owin <- spatstat.geom::as.owin(dplyr::filter(mpsz_cl, PLN_AREA_N == "TAMPINES"))
 ck_owin <- spatstat.geom::as.owin(dplyr::filter(mpsz_cl, PLN_AREA_N == "CHOA CHU KANG"))
@@ -118,7 +118,6 @@ childcare_pg_ppp <- childcareSG_ppp[pg_owin]
 childcare_tm_ppp <- childcareSG_ppp[tm_owin]
 childcare_ck_ppp <- childcareSG_ppp[ck_owin]
 childcare_jw_ppp <- childcareSG_ppp[jw_owin]
-
 ```
 
 # 5 Analysing Spatial Point Process Using G-Function
