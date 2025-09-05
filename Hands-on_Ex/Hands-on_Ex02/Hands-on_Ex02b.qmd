@@ -117,17 +117,10 @@ tm_owin <- spatstat.geom::as.owin(tm)
 ck_owin <- spatstat.geom::as.owin(ck)
 jw_owin <- spatstat.geom::as.owin(jw)
 
-childcare_pg_ppp <- childcare_ppp[pg_owin]
-childcare_tm_ppp <- childcare_ppp[tm_owin]
-childcare_ck_ppp <- childcare_ppp[ck_owin]
-childcare_jw_ppp <- childcare_ppp[jw_owin]
-
-# 8) (Optional but handy) rescale to kilometres for distance plots
-childcareSG_ppp_km  <- spatstat.geom::rescale.ppp(childcareSG_ppp, 1000, "km")
-childcare_pg_ppp_km <- spatstat.geom::rescale.ppp(childcare_pg_ppp, 1000, "km")
-childcare_tm_ppp_km <- spatstat.geom::rescale.ppp(childcare_tm_ppp, 1000, "km")
-childcare_ck_ppp_km <- spatstat.geom::rescale.ppp(childcare_ck_ppp, 1000, "km")
-childcare_jw_ppp_km <- spatstat.geom::rescale.ppp(childcare_jw_ppp, 1000, "km")
+childcare_pg_ppp <- childcareSG_ppp[pg_owin]
+childcare_tm_ppp <- childcareSG_ppp[tm_owin]
+childcare_ck_ppp <- childcareSG_ppp[ck_owin]
+childcare_jw_ppp <- childcareSG_ppp[jw_owin]
 ```
 
 # 5 Analysing Spatial Point Process Using G-Function

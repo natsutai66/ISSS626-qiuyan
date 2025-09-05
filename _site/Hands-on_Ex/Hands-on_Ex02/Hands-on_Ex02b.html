@@ -142,6 +142,10 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <a class="dropdown-item" href="../../Hands-on_Ex/Hands-on_Ex02/Hands-on_Ex02a.html">
  <span class="dropdown-text">Hands-on Exercise 2a</span></a>
   </li>  
+        <li>
+    <a class="dropdown-item" href="../../Hands-on_Ex/Hands-on_Ex02/Hands-on_Ex02b.html">
+ <span class="dropdown-text">Hands-on Exercise 2b</span></a>
+  </li>  
     </ul>
   </li>
   <li class="nav-item dropdown ">
@@ -411,17 +415,10 @@ Geodetic CRS:  WGS 84</code></pre>
 <span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a>ck_owin <span class="ot">&lt;-</span> spatstat.geom<span class="sc">::</span><span class="fu">as.owin</span>(ck)</span>
 <span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a>jw_owin <span class="ot">&lt;-</span> spatstat.geom<span class="sc">::</span><span class="fu">as.owin</span>(jw)</span>
 <span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-20"><a href="#cb6-20" aria-hidden="true" tabindex="-1"></a>childcare_pg_ppp <span class="ot">&lt;-</span> childcare_ppp[pg_owin]</span>
-<span id="cb6-21"><a href="#cb6-21" aria-hidden="true" tabindex="-1"></a>childcare_tm_ppp <span class="ot">&lt;-</span> childcare_ppp[tm_owin]</span>
-<span id="cb6-22"><a href="#cb6-22" aria-hidden="true" tabindex="-1"></a>childcare_ck_ppp <span class="ot">&lt;-</span> childcare_ppp[ck_owin]</span>
-<span id="cb6-23"><a href="#cb6-23" aria-hidden="true" tabindex="-1"></a>childcare_jw_ppp <span class="ot">&lt;-</span> childcare_ppp[jw_owin]</span>
-<span id="cb6-24"><a href="#cb6-24" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-25"><a href="#cb6-25" aria-hidden="true" tabindex="-1"></a><span class="co"># 8) (Optional but handy) rescale to kilometres for distance plots</span></span>
-<span id="cb6-26"><a href="#cb6-26" aria-hidden="true" tabindex="-1"></a>childcareSG_ppp_km  <span class="ot">&lt;-</span> spatstat.geom<span class="sc">::</span><span class="fu">rescale.ppp</span>(childcareSG_ppp, <span class="dv">1000</span>, <span class="st">"km"</span>)</span>
-<span id="cb6-27"><a href="#cb6-27" aria-hidden="true" tabindex="-1"></a>childcare_pg_ppp_km <span class="ot">&lt;-</span> spatstat.geom<span class="sc">::</span><span class="fu">rescale.ppp</span>(childcare_pg_ppp, <span class="dv">1000</span>, <span class="st">"km"</span>)</span>
-<span id="cb6-28"><a href="#cb6-28" aria-hidden="true" tabindex="-1"></a>childcare_tm_ppp_km <span class="ot">&lt;-</span> spatstat.geom<span class="sc">::</span><span class="fu">rescale.ppp</span>(childcare_tm_ppp, <span class="dv">1000</span>, <span class="st">"km"</span>)</span>
-<span id="cb6-29"><a href="#cb6-29" aria-hidden="true" tabindex="-1"></a>childcare_ck_ppp_km <span class="ot">&lt;-</span> spatstat.geom<span class="sc">::</span><span class="fu">rescale.ppp</span>(childcare_ck_ppp, <span class="dv">1000</span>, <span class="st">"km"</span>)</span>
-<span id="cb6-30"><a href="#cb6-30" aria-hidden="true" tabindex="-1"></a>childcare_jw_ppp_km <span class="ot">&lt;-</span> spatstat.geom<span class="sc">::</span><span class="fu">rescale.ppp</span>(childcare_jw_ppp, <span class="dv">1000</span>, <span class="st">"km"</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb6-20"><a href="#cb6-20" aria-hidden="true" tabindex="-1"></a>childcare_pg_ppp <span class="ot">&lt;-</span> childcareSG_ppp[pg_owin]</span>
+<span id="cb6-21"><a href="#cb6-21" aria-hidden="true" tabindex="-1"></a>childcare_tm_ppp <span class="ot">&lt;-</span> childcareSG_ppp[tm_owin]</span>
+<span id="cb6-22"><a href="#cb6-22" aria-hidden="true" tabindex="-1"></a>childcare_ck_ppp <span class="ot">&lt;-</span> childcareSG_ppp[ck_owin]</span>
+<span id="cb6-23"><a href="#cb6-23" aria-hidden="true" tabindex="-1"></a>childcare_jw_ppp <span class="ot">&lt;-</span> childcareSG_ppp[jw_owin]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 </section>
 <section id="analysing-spatial-point-process-using-g-function" class="level1">

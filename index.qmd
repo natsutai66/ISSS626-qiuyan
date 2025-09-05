@@ -4,4 +4,4 @@ title: "Welcome to my website!!"
 
 ◔.̮◔✧ Hi, I am Qiu Yan. Welcome to *ISSS626 Geospatial Analytics and Applications*. In this website, you will find my coursework prepared for this course. Thank you for visiting \~
 
-![](images/1687694836307-01.jpeg){fig-align="center" width="392"}
+![](images/6a23814e-65b6-4f74-a8c5-b8df27ed6b53.png){fig-align="center" width="448"}
