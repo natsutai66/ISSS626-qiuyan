@@ -335,11 +335,11 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <section id="data-import-and-preparation" class="level1">
 <h1>4 <strong>Data Import and Preparation</strong></h1>
 <div class="cell">
-<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co"># 1) Paths (adjust to your folder structure)</span></span>
-<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>kml_mpsz <span class="ot">&lt;-</span> <span class="st">"data/MasterPlan2019SubzoneBoundaryNoSeaKML.kml"</span></span>
+<div class="sourceCode cell-code" id="cb2"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb2-1"><a href="#cb2-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Paths</span></span>
+<span id="cb2-2"><a href="#cb2-2" aria-hidden="true" tabindex="-1"></a>kml_mpsz  <span class="ot">&lt;-</span> <span class="st">"data/MasterPlan2019SubzoneBoundaryNoSeaKML.kml"</span></span>
 <span id="cb2-3"><a href="#cb2-3" aria-hidden="true" tabindex="-1"></a>kml_child <span class="ot">&lt;-</span> <span class="st">"data/ChildCareServices.kml"</span></span>
 <span id="cb2-4"><a href="#cb2-4" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="co"># 2) Helper: extract fields from KML &lt;Description&gt; (as in Ch 4)</span></span>
+<span id="cb2-5"><a href="#cb2-5" aria-hidden="true" tabindex="-1"></a><span class="co"># Helper to parse KML &lt;Description&gt;</span></span>
 <span id="cb2-6"><a href="#cb2-6" aria-hidden="true" tabindex="-1"></a>extract_kml_field <span class="ot">&lt;-</span> <span class="cf">function</span>(html_text, field_name) {</span>
 <span id="cb2-7"><a href="#cb2-7" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="fu">is.na</span>(html_text) <span class="sc">||</span> html_text <span class="sc">==</span> <span class="st">""</span>) <span class="fu">return</span>(<span class="cn">NA_character_</span>)</span>
 <span id="cb2-8"><a href="#cb2-8" aria-hidden="true" tabindex="-1"></a>  page <span class="ot">&lt;-</span> rvest<span class="sc">::</span><span class="fu">read_html</span>(html_text)</span>
@@ -351,15 +351,15 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <span id="cb2-14"><a href="#cb2-14" aria-hidden="true" tabindex="-1"></a>  <span class="cf">if</span> (<span class="fu">length</span>(value) <span class="sc">==</span> <span class="dv">0</span>) <span class="cn">NA_character_</span> <span class="cf">else</span> value</span>
 <span id="cb2-15"><a href="#cb2-15" aria-hidden="true" tabindex="-1"></a>}</span>
 <span id="cb2-16"><a href="#cb2-16" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a><span class="co"># 3) Import &amp; tidy: Singapore subzones (remove Z/M, project to SVY21 EPSG:3414)</span></span>
+<span id="cb2-17"><a href="#cb2-17" aria-hidden="true" tabindex="-1"></a><span class="co"># --- 1) Subzones (SVY21, metres) -------------------------------------------</span></span>
 <span id="cb2-18"><a href="#cb2-18" aria-hidden="true" tabindex="-1"></a>mpsz_sf <span class="ot">&lt;-</span> sf<span class="sc">::</span><span class="fu">st_read</span>(kml_mpsz) <span class="sc">%&gt;%</span></span>
 <span id="cb2-19"><a href="#cb2-19" aria-hidden="true" tabindex="-1"></a>  sf<span class="sc">::</span><span class="fu">st_zm</span>(<span class="at">drop =</span> <span class="cn">TRUE</span>, <span class="at">what =</span> <span class="st">"ZM"</span>) <span class="sc">%&gt;%</span></span>
 <span id="cb2-20"><a href="#cb2-20" aria-hidden="true" tabindex="-1"></a>  sf<span class="sc">::</span><span class="fu">st_transform</span>(<span class="at">crs =</span> <span class="dv">3414</span>) <span class="sc">%&gt;%</span></span>
 <span id="cb2-21"><a href="#cb2-21" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">mutate</span>(</span>
-<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a>    <span class="at">REGION_N  =</span> purrr<span class="sc">::</span><span class="fu">map_chr</span>(Description, extract_kml_field, <span class="st">"REGION_N"</span>),</span>
-<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a>    <span class="at">PLN_AREA_N=</span> purrr<span class="sc">::</span><span class="fu">map_chr</span>(Description, extract_kml_field, <span class="st">"PLN_AREA_N"</span>),</span>
-<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a>    <span class="at">SUBZONE_N =</span> purrr<span class="sc">::</span><span class="fu">map_chr</span>(Description, extract_kml_field, <span class="st">"SUBZONE_N"</span>),</span>
-<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a>    <span class="at">SUBZONE_C =</span> purrr<span class="sc">::</span><span class="fu">map_chr</span>(Description, extract_kml_field, <span class="st">"SUBZONE_C"</span>)</span>
+<span id="cb2-22"><a href="#cb2-22" aria-hidden="true" tabindex="-1"></a>    <span class="at">REGION_N   =</span> purrr<span class="sc">::</span><span class="fu">map_chr</span>(Description, extract_kml_field, <span class="st">"REGION_N"</span>),</span>
+<span id="cb2-23"><a href="#cb2-23" aria-hidden="true" tabindex="-1"></a>    <span class="at">PLN_AREA_N =</span> purrr<span class="sc">::</span><span class="fu">map_chr</span>(Description, extract_kml_field, <span class="st">"PLN_AREA_N"</span>),</span>
+<span id="cb2-24"><a href="#cb2-24" aria-hidden="true" tabindex="-1"></a>    <span class="at">SUBZONE_N  =</span> purrr<span class="sc">::</span><span class="fu">map_chr</span>(Description, extract_kml_field, <span class="st">"SUBZONE_N"</span>),</span>
+<span id="cb2-25"><a href="#cb2-25" aria-hidden="true" tabindex="-1"></a>    <span class="at">SUBZONE_C  =</span> purrr<span class="sc">::</span><span class="fu">map_chr</span>(Description, extract_kml_field, <span class="st">"SUBZONE_C"</span>)</span>
 <span id="cb2-26"><a href="#cb2-26" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">%&gt;%</span></span>
 <span id="cb2-27"><a href="#cb2-27" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">select</span>(<span class="sc">-</span>Name, <span class="sc">-</span>Description) <span class="sc">%&gt;%</span></span>
 <span id="cb2-28"><a href="#cb2-28" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">relocate</span>(geometry, <span class="at">.after =</span> dplyr<span class="sc">::</span><span class="fu">last_col</span>())</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
@@ -373,7 +373,7 @@ Dimension:     XY
 Bounding box:  xmin: 103.6057 ymin: 1.158699 xmax: 104.0885 ymax: 1.470775
 Geodetic CRS:  WGS 84</code></pre>
 </div>
-<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Optional: clip out offshore/islands (same as Ch 4)</span></span>
+<div class="sourceCode cell-code" id="cb4"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb4-1"><a href="#cb4-1" aria-hidden="true" tabindex="-1"></a><span class="co"># Remove offshore groups (same as exercises)</span></span>
 <span id="cb4-2"><a href="#cb4-2" aria-hidden="true" tabindex="-1"></a>mpsz_cl <span class="ot">&lt;-</span> mpsz_sf <span class="sc">%&gt;%</span></span>
 <span id="cb4-3"><a href="#cb4-3" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(</span>
 <span id="cb4-4"><a href="#cb4-4" aria-hidden="true" tabindex="-1"></a>    SUBZONE_N  <span class="sc">!=</span> <span class="st">"SOUTHERN GROUP"</span>,</span>
@@ -381,10 +381,11 @@ Geodetic CRS:  WGS 84</code></pre>
 <span id="cb4-6"><a href="#cb4-6" aria-hidden="true" tabindex="-1"></a>    PLN_AREA_N <span class="sc">!=</span> <span class="st">"NORTH-EASTERN ISLANDS"</span></span>
 <span id="cb4-7"><a href="#cb4-7" aria-hidden="true" tabindex="-1"></a>  )</span>
 <span id="cb4-8"><a href="#cb4-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a><span class="co"># 4) Import childcare points and project to SVY21</span></span>
+<span id="cb4-9"><a href="#cb4-9" aria-hidden="true" tabindex="-1"></a><span class="co"># --- 2) Childcare points (SVY21, metres) ------------------------------------</span></span>
 <span id="cb4-10"><a href="#cb4-10" aria-hidden="true" tabindex="-1"></a>childcare_sf <span class="ot">&lt;-</span> sf<span class="sc">::</span><span class="fu">st_read</span>(kml_child) <span class="sc">%&gt;%</span></span>
 <span id="cb4-11"><a href="#cb4-11" aria-hidden="true" tabindex="-1"></a>  sf<span class="sc">::</span><span class="fu">st_zm</span>(<span class="at">drop =</span> <span class="cn">TRUE</span>, <span class="at">what =</span> <span class="st">"ZM"</span>) <span class="sc">%&gt;%</span></span>
-<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>  sf<span class="sc">::</span><span class="fu">st_transform</span>(<span class="at">crs =</span> <span class="dv">3414</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb4-12"><a href="#cb4-12" aria-hidden="true" tabindex="-1"></a>  sf<span class="sc">::</span><span class="fu">st_transform</span>(<span class="at">crs =</span> <span class="dv">3414</span>) <span class="sc">%&gt;%</span></span>
+<span id="cb4-13"><a href="#cb4-13" aria-hidden="true" tabindex="-1"></a>  dplyr<span class="sc">::</span><span class="fu">filter</span>(<span class="sc">!</span>sf<span class="sc">::</span><span class="fu">st_is_empty</span>(geometry))  <span class="co"># guard against empties</span></span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code>Reading layer `CHILDCARE' from data source 
   `C:\Users\tqy87\OneDrive\Documents\natsutai66\ISSS626-qiuyan\Hands-on_Ex\Hands-on_Ex02\data\ChildCareServices.kml' 
@@ -396,29 +397,25 @@ Bounding box:  xmin: 103.6878 ymin: 1.247759 xmax: 103.9897 ymax: 1.462134
 z_range:       zmin: 0 zmax: 0
 Geodetic CRS:  WGS 84</code></pre>
 </div>
-<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co"># 5) Convert to spatstat structures for point-process analysis</span></span>
-<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a><span class="co">#    - ppp: point pattern; owin: study window</span></span>
-<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>childcare_ppp <span class="ot">&lt;-</span> spatstat.geom<span class="sc">::</span><span class="fu">as.ppp</span>(childcare_sf)</span>
-<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>sg_owin       <span class="ot">&lt;-</span> spatstat.geom<span class="sc">::</span><span class="fu">as.owin</span>(mpsz_cl)</span>
+<div class="sourceCode cell-code" id="cb6"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb6-1"><a href="#cb6-1" aria-hidden="true" tabindex="-1"></a><span class="co"># --- 3) Convert to spatstat &amp; enforce simple point pattern -------------------</span></span>
+<span id="cb6-2"><a href="#cb6-2" aria-hidden="true" tabindex="-1"></a>childcare_ppp <span class="ot">&lt;-</span> spatstat.geom<span class="sc">::</span><span class="fu">as.ppp</span>(childcare_sf)</span>
+<span id="cb6-3"><a href="#cb6-3" aria-hidden="true" tabindex="-1"></a>spatstat.geom<span class="sc">::</span><span class="fu">unitname</span>(childcare_ppp) <span class="ot">&lt;-</span> <span class="st">"metre"</span>        <span class="co"># explicit unit</span></span>
+<span id="cb6-4"><a href="#cb6-4" aria-hidden="true" tabindex="-1"></a>childcare_ppp <span class="ot">&lt;-</span> spatstat.geom<span class="sc">::</span><span class="fu">unique.ppp</span>(childcare_ppp) <span class="co"># remove duplicates</span></span>
 <span id="cb6-5"><a href="#cb6-5" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a><span class="co"># 6) Clip points to Singapore window (ppp within owin)</span></span>
-<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>childcareSG_ppp <span class="ot">&lt;-</span> childcare_ppp[sg_owin]</span>
-<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a><span class="co"># 7) Create planning-area subsets used later in Ch 5 (G/F functions)</span></span>
-<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a>pg <span class="ot">&lt;-</span> mpsz_cl <span class="sc">%&gt;%</span> dplyr<span class="sc">::</span><span class="fu">filter</span>(PLN_AREA_N <span class="sc">==</span> <span class="st">"PUNGGOL"</span>)</span>
-<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>tm <span class="ot">&lt;-</span> mpsz_cl <span class="sc">%&gt;%</span> dplyr<span class="sc">::</span><span class="fu">filter</span>(PLN_AREA_N <span class="sc">==</span> <span class="st">"TAMPINES"</span>)</span>
-<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>ck <span class="ot">&lt;-</span> mpsz_cl <span class="sc">%&gt;%</span> dplyr<span class="sc">::</span><span class="fu">filter</span>(PLN_AREA_N <span class="sc">==</span> <span class="st">"CHOA CHU KANG"</span>)</span>
-<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>jw <span class="ot">&lt;-</span> mpsz_cl <span class="sc">%&gt;%</span> dplyr<span class="sc">::</span><span class="fu">filter</span>(PLN_AREA_N <span class="sc">==</span> <span class="st">"JURONG WEST"</span>)</span>
-<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a>pg_owin <span class="ot">&lt;-</span> spatstat.geom<span class="sc">::</span><span class="fu">as.owin</span>(pg)</span>
-<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a>tm_owin <span class="ot">&lt;-</span> spatstat.geom<span class="sc">::</span><span class="fu">as.owin</span>(tm)</span>
-<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a>ck_owin <span class="ot">&lt;-</span> spatstat.geom<span class="sc">::</span><span class="fu">as.owin</span>(ck)</span>
-<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a>jw_owin <span class="ot">&lt;-</span> spatstat.geom<span class="sc">::</span><span class="fu">as.owin</span>(jw)</span>
-<span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb6-20"><a href="#cb6-20" aria-hidden="true" tabindex="-1"></a>childcare_pg_ppp <span class="ot">&lt;-</span> childcareSG_ppp[pg_owin]</span>
-<span id="cb6-21"><a href="#cb6-21" aria-hidden="true" tabindex="-1"></a>childcare_tm_ppp <span class="ot">&lt;-</span> childcareSG_ppp[tm_owin]</span>
-<span id="cb6-22"><a href="#cb6-22" aria-hidden="true" tabindex="-1"></a>childcare_ck_ppp <span class="ot">&lt;-</span> childcareSG_ppp[ck_owin]</span>
-<span id="cb6-23"><a href="#cb6-23" aria-hidden="true" tabindex="-1"></a>childcare_jw_ppp <span class="ot">&lt;-</span> childcareSG_ppp[jw_owin]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb6-6"><a href="#cb6-6" aria-hidden="true" tabindex="-1"></a><span class="co"># --- 4) Clip to Singapore window --------------------------------------------</span></span>
+<span id="cb6-7"><a href="#cb6-7" aria-hidden="true" tabindex="-1"></a>sg_owin        <span class="ot">&lt;-</span> spatstat.geom<span class="sc">::</span><span class="fu">as.owin</span>(mpsz_cl)</span>
+<span id="cb6-8"><a href="#cb6-8" aria-hidden="true" tabindex="-1"></a>childcareSG_ppp <span class="ot">&lt;-</span> childcare_ppp[sg_owin]</span>
+<span id="cb6-9"><a href="#cb6-9" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-10"><a href="#cb6-10" aria-hidden="true" tabindex="-1"></a><span class="co"># --- 5) Planning-area subsets (subset AFTER clip &amp; de-dup) -------------------</span></span>
+<span id="cb6-11"><a href="#cb6-11" aria-hidden="true" tabindex="-1"></a>pg_owin <span class="ot">&lt;-</span> spatstat.geom<span class="sc">::</span><span class="fu">as.owin</span>(dplyr<span class="sc">::</span><span class="fu">filter</span>(mpsz_cl, PLN_AREA_N <span class="sc">==</span> <span class="st">"PUNGGOL"</span>))</span>
+<span id="cb6-12"><a href="#cb6-12" aria-hidden="true" tabindex="-1"></a>tm_owin <span class="ot">&lt;-</span> spatstat.geom<span class="sc">::</span><span class="fu">as.owin</span>(dplyr<span class="sc">::</span><span class="fu">filter</span>(mpsz_cl, PLN_AREA_N <span class="sc">==</span> <span class="st">"TAMPINES"</span>))</span>
+<span id="cb6-13"><a href="#cb6-13" aria-hidden="true" tabindex="-1"></a>ck_owin <span class="ot">&lt;-</span> spatstat.geom<span class="sc">::</span><span class="fu">as.owin</span>(dplyr<span class="sc">::</span><span class="fu">filter</span>(mpsz_cl, PLN_AREA_N <span class="sc">==</span> <span class="st">"CHOA CHU KANG"</span>))</span>
+<span id="cb6-14"><a href="#cb6-14" aria-hidden="true" tabindex="-1"></a>jw_owin <span class="ot">&lt;-</span> spatstat.geom<span class="sc">::</span><span class="fu">as.owin</span>(dplyr<span class="sc">::</span><span class="fu">filter</span>(mpsz_cl, PLN_AREA_N <span class="sc">==</span> <span class="st">"JURONG WEST"</span>))</span>
+<span id="cb6-15"><a href="#cb6-15" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb6-16"><a href="#cb6-16" aria-hidden="true" tabindex="-1"></a>childcare_pg_ppp <span class="ot">&lt;-</span> childcareSG_ppp[pg_owin]</span>
+<span id="cb6-17"><a href="#cb6-17" aria-hidden="true" tabindex="-1"></a>childcare_tm_ppp <span class="ot">&lt;-</span> childcareSG_ppp[tm_owin]</span>
+<span id="cb6-18"><a href="#cb6-18" aria-hidden="true" tabindex="-1"></a>childcare_ck_ppp <span class="ot">&lt;-</span> childcareSG_ppp[ck_owin]</span>
+<span id="cb6-19"><a href="#cb6-19" aria-hidden="true" tabindex="-1"></a>childcare_jw_ppp <span class="ot">&lt;-</span> childcareSG_ppp[jw_owin]</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
 </section>
 <section id="analysing-spatial-point-process-using-g-function" class="level1">

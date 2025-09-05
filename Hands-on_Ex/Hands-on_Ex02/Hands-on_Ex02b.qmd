@@ -56,11 +56,11 @@ pacman::p_load(sf, spatstat, tmap, tidyverse, purrr, xml2)
 # 4 **Data Import and Preparation**
 
 ```{r}
-# 1) Paths (adjust to your folder structure)
-kml_mpsz <- "data/MasterPlan2019SubzoneBoundaryNoSeaKML.kml"
+# Paths
+kml_mpsz  <- "data/MasterPlan2019SubzoneBoundaryNoSeaKML.kml"
 kml_child <- "data/ChildCareServices.kml"
 
-# 2) Helper: extract fields from KML <Description> (as in Ch 4)
+# Helper to parse KML <Description>
 extract_kml_field <- function(html_text, field_name) {
   if (is.na(html_text) || html_text == "") return(NA_character_)
   page <- rvest::read_html(html_text)
@@ -72,20 +72,20 @@ extract_kml_field <- function(html_text, field_name) {
   if (length(value) == 0) NA_character_ else value
 }
 
-# 3) Import & tidy: Singapore subzones (remove Z/M, project to SVY21 EPSG:3414)
+# --- 1) Subzones (SVY21, metres) -------------------------------------------
 mpsz_sf <- sf::st_read(kml_mpsz) %>%
   sf::st_zm(drop = TRUE, what = "ZM") %>%
   sf::st_transform(crs = 3414) %>%
   dplyr::mutate(
-    REGION_N  = purrr::map_chr(Description, extract_kml_field, "REGION_N"),
-    PLN_AREA_N= purrr::map_chr(Description, extract_kml_field, "PLN_AREA_N"),
-    SUBZONE_N = purrr::map_chr(Description, extract_kml_field, "SUBZONE_N"),
-    SUBZONE_C = purrr::map_chr(Description, extract_kml_field, "SUBZONE_C")
+    REGION_N   = purrr::map_chr(Description, extract_kml_field, "REGION_N"),
+    PLN_AREA_N = purrr::map_chr(Description, extract_kml_field, "PLN_AREA_N"),
+    SUBZONE_N  = purrr::map_chr(Description, extract_kml_field, "SUBZONE_N"),
+    SUBZONE_C  = purrr::map_chr(Description, extract_kml_field, "SUBZONE_C")
   ) %>%
   dplyr::select(-Name, -Description) %>%
   dplyr::relocate(geometry, .after = dplyr::last_col())
 
-# Optional: clip out offshore/islands (same as Ch 4)
+# Remove offshore groups (same as exercises)
 mpsz_cl <- mpsz_sf %>%
   dplyr::filter(
     SUBZONE_N  != "SOUTHERN GROUP",
@@ -93,34 +93,32 @@ mpsz_cl <- mpsz_sf %>%
     PLN_AREA_N != "NORTH-EASTERN ISLANDS"
   )
 
-# 4) Import childcare points and project to SVY21
+# --- 2) Childcare points (SVY21, metres) ------------------------------------
 childcare_sf <- sf::st_read(kml_child) %>%
   sf::st_zm(drop = TRUE, what = "ZM") %>%
-  sf::st_transform(crs = 3414)
+  sf::st_transform(crs = 3414) %>%
+  dplyr::filter(!sf::st_is_empty(geometry))  # guard against empties
 
-# 5) Convert to spatstat structures for point-process analysis
-#    - ppp: point pattern; owin: study window
+# --- 3) Convert to spatstat & enforce simple point pattern -------------------
 childcare_ppp <- spatstat.geom::as.ppp(childcare_sf)
-sg_owin       <- spatstat.geom::as.owin(mpsz_cl)
+spatstat.geom::unitname(childcare_ppp) <- "metre"        # explicit unit
+childcare_ppp <- spatstat.geom::unique.ppp(childcare_ppp) # remove duplicates
 
-# 6) Clip points to Singapore window (ppp within owin)
+# --- 4) Clip to Singapore window --------------------------------------------
+sg_owin        <- spatstat.geom::as.owin(mpsz_cl)
 childcareSG_ppp <- childcare_ppp[sg_owin]
 
-# 7) Create planning-area subsets used later in Ch 5 (G/F functions)
-pg <- mpsz_cl %>% dplyr::filter(PLN_AREA_N == "PUNGGOL")
-tm <- mpsz_cl %>% dplyr::filter(PLN_AREA_N == "TAMPINES")
-ck <- mpsz_cl %>% dplyr::filter(PLN_AREA_N == "CHOA CHU KANG")
-jw <- mpsz_cl %>% dplyr::filter(PLN_AREA_N == "JURONG WEST")
-
-pg_owin <- spatstat.geom::as.owin(pg)
-tm_owin <- spatstat.geom::as.owin(tm)
-ck_owin <- spatstat.geom::as.owin(ck)
-jw_owin <- spatstat.geom::as.owin(jw)
+# --- 5) Planning-area subsets (subset AFTER clip & de-dup) -------------------
+pg_owin <- spatstat.geom::as.owin(dplyr::filter(mpsz_cl, PLN_AREA_N == "PUNGGOL"))
+tm_owin <- spatstat.geom::as.owin(dplyr::filter(mpsz_cl, PLN_AREA_N == "TAMPINES"))
+ck_owin <- spatstat.geom::as.owin(dplyr::filter(mpsz_cl, PLN_AREA_N == "CHOA CHU KANG"))
+jw_owin <- spatstat.geom::as.owin(dplyr::filter(mpsz_cl, PLN_AREA_N == "JURONG WEST"))
 
 childcare_pg_ppp <- childcareSG_ppp[pg_owin]
 childcare_tm_ppp <- childcareSG_ppp[tm_owin]
 childcare_ck_ppp <- childcareSG_ppp[ck_owin]
 childcare_jw_ppp <- childcareSG_ppp[jw_owin]
+
 ```
 
 # 5 Analysing Spatial Point Process Using G-Function
