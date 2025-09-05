@@ -1,8 +1,8 @@
 ---
-title: "Hands-on_Ex02"
-description: "Beyond ggplot2 Fundamentals"
+title: "Hands-on_Ex02a"
+description: "First-order Spatial Point Patterns Analysis Methods"
 author: "Tai Qiu Yan"
-date: "April 23, 2024"
+date: "September 5, 2025"
 date-modified: "last-modified"
 format: html
 editor: visual
