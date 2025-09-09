@@ -208,5 +208,117 @@
     "title": "Hands-on_Ex02a",
     "section": "10.3 Computing KDE surfaces by planning area",
     "text": "10.3 Computing KDE surfaces by planning area\nThe code chunk below will be used to compute the KDE of these four planning area. bw.diggle method is used to derive the bandwidth of each\n\npar(mfrow=c(2,2))\nplot(density(childcare_pg_ppp.km, \n             sigma=bw.diggle, \n             edge=TRUE, \n             kernel=\"gaussian\"),\n     main=\"Punggol\")\nplot(density(childcare_tm_ppp.km, \n             sigma=bw.diggle, \n             edge=TRUE, \n             kernel=\"gaussian\"),\n     main=\"Tempines\")\nplot(density(childcare_ck_ppp.km, \n             sigma=bw.diggle, \n             edge=TRUE, \n             kernel=\"gaussian\"),\n     main=\"Choa Chu Kang\")\nplot(density(childcare_jw_ppp.km, \n             sigma=bw.diggle, \n             edge=TRUE, \n             kernel=\"gaussian\"),\n     main=\"Jurong West\")"
+  },
+  {
+    "objectID": "Hands-on_Ex/Hands-on_Ex03/Hands-on_Ex03.html",
+    "href": "Hands-on_Ex/Hands-on_Ex03/Hands-on_Ex03.html",
+    "title": "Hands-on_Ex03",
+    "section": "",
+    "text": "A spatio-temporal point process (also called space-time or spatial-temporal point process) is a random collection of points, where each point represents the time and location of an event. Examples of events include incidence of disease, sightings or births of a species, or the occurrences of fires, earthquakes, lightning strikes, tsunamis, or volcanic eruptions.\nThe analysis of spatio-temporal point patterns is becoming increasingly necessary, given the rapid emergence of geographically and temporally indexed data in a wide range of fields. Several spatio-temporal point patterns analysis methods have been introduced and implemented in R in the last ten years. This chapter shows how various R packages can be combined to run a set of spatio-temporal point pattern analyses in a guided and intuitive way. A real world forest fire events in Kepulauan Bangka Belitung, Indonesia from 1st January 2023 to 31st December 2023 is used to illustrate the methods, procedures and interpretations."
+  },
+  {
+    "objectID": "Hands-on_Ex/Hands-on_Ex03/Hands-on_Ex03.html#the-research-questions",
+    "href": "Hands-on_Ex/Hands-on_Ex03/Hands-on_Ex03.html#the-research-questions",
+    "title": "Hands-on_Ex03",
+    "section": "2.1 The research questions",
+    "text": "2.1 The research questions\nThe specific questions we would like to answer are:\n\nare the locations of forest fire in Kepulauan Bangka Belitung spatial and spatio-temporally independent?\nif the answer is NO, where and when the observed forest fire locations tend to cluster?"
+  },
+  {
+    "objectID": "Hands-on_Ex/Hands-on_Ex03/Hands-on_Ex03.html#importing-study-area",
+    "href": "Hands-on_Ex/Hands-on_Ex03/Hands-on_Ex03.html#importing-study-area",
+    "title": "Hands-on_Ex03",
+    "section": "5.1 Importing study area",
+    "text": "5.1 Importing study area\nCode chunk below is used import study area (i.e. Kepulauan Bangka Belitung) into R environment.\n\nkbb &lt;- st_read(dsn=\"data\",\n               layer = \"Kepulauan_Bangka_Belitung\") \n\nReading layer `Kepulauan_Bangka_Belitung' from data source \n  `C:\\Users\\tqy87\\OneDrive\\Documents\\natsutai66\\ISSS626-qiuyan\\Hands-on_Ex\\Hands-on_Ex03\\data' \n  using driver `ESRI Shapefile'\nSimple feature collection with 297 features and 26 fields\nGeometry type: POLYGON\nDimension:     XYZ\nBounding box:  xmin: 105.1085 ymin: -3.116593 xmax: 106.8488 ymax: -1.501603\nz_range:       zmin: 0 zmax: 0\nGeodetic CRS:  WGS 84\n\n\nThe revised code chunk.\n\nkbb_sf &lt;- st_read(dsn=\"data\",\n               layer = \"Kepulauan_Bangka_Belitung\") %&gt;%\n  st_union() %&gt;%\n  st_zm(drop = TRUE, what = \"ZM\") %&gt;%\n  st_transform(crs = 32748)\n\nReading layer `Kepulauan_Bangka_Belitung' from data source \n  `C:\\Users\\tqy87\\OneDrive\\Documents\\natsutai66\\ISSS626-qiuyan\\Hands-on_Ex\\Hands-on_Ex03\\data' \n  using driver `ESRI Shapefile'\nSimple feature collection with 297 features and 26 fields\nGeometry type: POLYGON\nDimension:     XYZ\nBounding box:  xmin: 105.1085 ymin: -3.116593 xmax: 106.8488 ymax: -1.501603\nz_range:       zmin: 0 zmax: 0\nGeodetic CRS:  WGS 84"
+  },
+  {
+    "objectID": "Hands-on_Ex/Hands-on_Ex03/Hands-on_Ex03.html#converting-owin",
+    "href": "Hands-on_Ex/Hands-on_Ex03/Hands-on_Ex03.html#converting-owin",
+    "title": "Hands-on_Ex03",
+    "section": "5.2 Converting OWIN",
+    "text": "5.2 Converting OWIN\nNext, as.owin() is used to convert kbb into an owin object.\n\nkbb_owin &lt;- as.owin(kbb_sf)\nkbb_owin\n\nwindow: polygonal boundary\nenclosing rectangle: [512066.8, 705559.4] x [9655398, 9834006] units\n\n\nNext, class() is used to confirm if the output is indeed an owin object.\n\nclass(kbb_owin)\n\n[1] \"owin\""
+  },
+  {
+    "objectID": "Hands-on_Ex/Hands-on_Ex03/Hands-on_Ex03.html#overall-plot",
+    "href": "Hands-on_Ex/Hands-on_Ex03/Hands-on_Ex03.html#overall-plot",
+    "title": "Hands-on_Ex03",
+    "section": "7.1 Overall plot",
+    "text": "7.1 Overall plot\n\ntm_shape(kbb_sf)+\n  tm_polygons() +\ntm_shape(fire_sf) +\n  tm_dots()"
+  },
+  {
+    "objectID": "Hands-on_Ex/Hands-on_Ex03/Hands-on_Ex03.html#visuaising-geographic-distribution-of-forest-fires-by-month",
+    "href": "Hands-on_Ex/Hands-on_Ex03/Hands-on_Ex03.html#visuaising-geographic-distribution-of-forest-fires-by-month",
+    "title": "Hands-on_Ex03",
+    "section": "7.2 Visuaising geographic distribution of forest fires by month",
+    "text": "7.2 Visuaising geographic distribution of forest fires by month\n\ntm_shape(kbb_sf)+\n  tm_polygons() +\ntm_shape(fire_sf) +\n  tm_dots(size = 0.1) +\ntm_facets(by=\"Month_fac\", \n            free.coords=FALSE, \n            drop.units = TRUE)"
+  },
+  {
+    "objectID": "Hands-on_Ex/Hands-on_Ex03/Hands-on_Ex03.html#extracting-forest-fires-by-month",
+    "href": "Hands-on_Ex/Hands-on_Ex03/Hands-on_Ex03.html#extracting-forest-fires-by-month",
+    "title": "Hands-on_Ex03",
+    "section": "8.1 Extracting forest fires by month",
+    "text": "8.1 Extracting forest fires by month\nThe code chunk below is used to remove the unwanted fields from fire_sf sf data.frame. This is because as.ppp() only need the mark field and geometry field from the input sf data.frame.\n\nfire_month &lt;- fire_sf %&gt;% \n  select(Month_num)"
+  },
+  {
+    "objectID": "Hands-on_Ex/Hands-on_Ex03/Hands-on_Ex03.html#creating-ppp",
+    "href": "Hands-on_Ex/Hands-on_Ex03/Hands-on_Ex03.html#creating-ppp",
+    "title": "Hands-on_Ex03",
+    "section": "8.2 Creating ppp",
+    "text": "8.2 Creating ppp\nThe code chunk below is used to derive a ppp object called fire_month from fire_month sf data.frame.\n\nfire_month_ppp &lt;- as.ppp(fire_month)\nfire_month_ppp\n\nMarked planar point pattern: 741 points\nmarks are numeric, of storage type  'double'\nwindow: rectangle = [521564.1, 695791] x [9658137, 9828767] units\n\n\nThe code chunk below is used to check the output is in the correct object class.\n\nsummary(fire_month_ppp)\n\nMarked planar point pattern:  741 points\nAverage intensity 2.49258e-08 points per square unit\n\nCoordinates are given to 10 decimal places\n\nmarks are numeric, of type 'double'\nSummary:\n   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. \n  1.000   8.000   9.000   8.579  10.000  12.000 \n\nWindow: rectangle = [521564.1, 695791] x [9658137, 9828767] units\n                    (174200 x 170600 units)\nWindow area = 29728200000 square units\n\n\nNext, we will check if there are duplicated point events by using the code chunk below.\n\nany(duplicated(fire_month_ppp))\n\n[1] FALSE"
+  },
+  {
+    "objectID": "Hands-on_Ex/Hands-on_Ex03/Hands-on_Ex03.html#including-owin-object",
+    "href": "Hands-on_Ex/Hands-on_Ex03/Hands-on_Ex03.html#including-owin-object",
+    "title": "Hands-on_Ex03",
+    "section": "8.3 Including Owin object",
+    "text": "8.3 Including Owin object\nThe code chunk below is used to combine origin_am_ppp and am_owin objects into one.\n\nfire_month_owin &lt;- fire_month_ppp[kbb_owin]\nsummary(fire_month_owin)\n\nMarked planar point pattern:  741 points\nAverage intensity 6.42469e-08 points per square unit\n\nCoordinates are given to 10 decimal places\n\nmarks are numeric, of type 'double'\nSummary:\n   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. \n  1.000   8.000   9.000   8.579  10.000  12.000 \n\nWindow: polygonal boundary\nsingle connected closed polygon with 47493 vertices\nenclosing rectangle: [512066.8, 705559.4] x [9655398, 9834006] units\n                     (193500 x 178600 units)\nWindow area = 11533600000 square units\nFraction of frame area: 0.334\n\n\nAs a good practice, plot() is used to plot ff_owin so that we can examine the correctness of the output object.\n\nplot(fire_month_owin)"
+  },
+  {
+    "objectID": "Hands-on_Ex/Hands-on_Ex03/Hands-on_Ex03.html#computing-spatio-temporal-kde",
+    "href": "Hands-on_Ex/Hands-on_Ex03/Hands-on_Ex03.html#computing-spatio-temporal-kde",
+    "title": "Hands-on_Ex03",
+    "section": "8.4 Computing Spatio-temporal KDE",
+    "text": "8.4 Computing Spatio-temporal KDE\nNext, spattemp.density() of sparr package is used to compute the STKDE.\n\nst_kde &lt;- spattemp.density(fire_month_owin)\nsummary(st_kde)\n\nSpatiotemporal Kernel Density Estimate\n\nBandwidths\n  h = 15102.47 (spatial)\n  lambda = 0.0304 (temporal)\n\nNo. of observations\n  741 \n\nSpatial bound\n  Type: polygonal\n  2D enclosure: [512066.8, 705559.4] x [9655398, 9834006]\n\nTemporal bound\n  [1, 12]\n\nEvaluation\n  128 x 128 x 12 trivariate lattice\n  Density range: [1.233458e-27, 8.202976e-10]"
+  },
+  {
+    "objectID": "Hands-on_Ex/Hands-on_Ex03/Hands-on_Ex03.html#plotting-the-spatio-temporal-kde-object",
+    "href": "Hands-on_Ex/Hands-on_Ex03/Hands-on_Ex03.html#plotting-the-spatio-temporal-kde-object",
+    "title": "Hands-on_Ex03",
+    "section": "8.5 Plotting the spatio-temporal KDE object",
+    "text": "8.5 Plotting the spatio-temporal KDE object\nIn the code chunk below, plot() of R base is used to the KDE for between July 2023 - December 2023.\n\ntims &lt;- c(7,8,9,10,11,12)\npar(mfcol=c(2,3))\nfor(i in tims){ \n  plot(st_kde, i, \n       override.par=FALSE, \n       fix.range=TRUE, \n       main=paste(\"KDE at month\",i))\n}"
+  },
+  {
+    "objectID": "Hands-on_Ex/Hands-on_Ex03/Hands-on_Ex03.html#creating-ppp-object",
+    "href": "Hands-on_Ex/Hands-on_Ex03/Hands-on_Ex03.html#creating-ppp-object",
+    "title": "Hands-on_Ex03",
+    "section": "9.1 Creating ppp object",
+    "text": "9.1 Creating ppp object\nIn the code chunk below, DayofYear field is included in the output ppp object.\n\nfire_yday_ppp &lt;- fire_sf %&gt;% \n  select(DayofYear) %&gt;%\n  as.ppp()"
+  },
+  {
+    "objectID": "Hands-on_Ex/Hands-on_Ex03/Hands-on_Ex03.html#including-owin-object-1",
+    "href": "Hands-on_Ex/Hands-on_Ex03/Hands-on_Ex03.html#including-owin-object-1",
+    "title": "Hands-on_Ex03",
+    "section": "9.2 Including Owin object",
+    "text": "9.2 Including Owin object\nNext, code chunk below is used to combine the ppp object and the owin object.\n\nfire_yday_owin &lt;- fire_yday_ppp[kbb_owin]\nsummary(fire_yday_owin)\n\nMarked planar point pattern:  741 points\nAverage intensity 6.42469e-08 points per square unit\n\nCoordinates are given to 10 decimal places\n\nmarks are numeric, of type 'double'\nSummary:\n   Min. 1st Qu.  Median    Mean 3rd Qu.    Max. \n   10.0   213.0   258.0   245.9   287.0   352.0 \n\nWindow: polygonal boundary\nsingle connected closed polygon with 47493 vertices\nenclosing rectangle: [512066.8, 705559.4] x [9655398, 9834006] units\n                     (193500 x 178600 units)\nWindow area = 11533600000 square units\nFraction of frame area: 0.334\n\n\n\nkde_yday &lt;- spattemp.density(\n  fire_yday_owin)\nsummary(kde_yday)\n\nSpatiotemporal Kernel Density Estimate\n\nBandwidths\n  h = 15102.47 (spatial)\n  lambda = 6.3198 (temporal)\n\nNo. of observations\n  741 \n\nSpatial bound\n  Type: polygonal\n  2D enclosure: [512066.8, 705559.4] x [9655398, 9834006]\n\nTemporal bound\n  [10, 352]\n\nEvaluation\n  128 x 128 x 343 trivariate lattice\n  Density range: [3.959516e-27, 2.751287e-12]\n\n\n\nplot(kde_yday)"
+  },
+  {
+    "objectID": "Hands-on_Ex/Hands-on_Ex03/Hands-on_Ex03.html#computing-spatio-temporal-kde-1",
+    "href": "Hands-on_Ex/Hands-on_Ex03/Hands-on_Ex03.html#computing-spatio-temporal-kde-1",
+    "title": "Hands-on_Ex03",
+    "section": "10.1 Computing spatio-temporal KDE",
+    "text": "10.1 Computing spatio-temporal KDE\nNow, the STKDE will be derived by using h and lambda values derive in previous step.\n\nkde_yday &lt;- spattemp.density(fire_yday_owin,\n                             h = 9000,\n                             lambda = 19)\nsummary(kde_yday)\n\nSpatiotemporal Kernel Density Estimate\n\nBandwidths\n  h = 9000 (spatial)\n  lambda = 19 (temporal)\n\nNo. of observations\n  741 \n\nSpatial bound\n  Type: polygonal\n  2D enclosure: [512066.8, 705559.4] x [9655398, 9834006]\n\nTemporal bound\n  [10, 352]\n\nEvaluation\n  128 x 128 x 343 trivariate lattice\n  Density range: [2.001642e-19, 2.445724e-12]"
+  },
+  {
+    "objectID": "Hands-on_Ex/Hands-on_Ex03/Hands-on_Ex03.html#plotting-the-output-spatio-temporal-kde",
+    "href": "Hands-on_Ex/Hands-on_Ex03/Hands-on_Ex03.html#plotting-the-output-spatio-temporal-kde",
+    "title": "Hands-on_Ex03",
+    "section": "10.2 Plotting the output spatio-temporal KDE",
+    "text": "10.2 Plotting the output spatio-temporal KDE\nLast, plot() of sparr package is used to plot the output as shown below.\n\nplot(kde_yday)"
+  },
+  {
+    "objectID": "Hands-on_Ex/Hands-on_Ex03/data/Kepulauan_Bangka_Belitung.html",
+    "href": "Hands-on_Ex/Hands-on_Ex03/data/Kepulauan_Bangka_Belitung.html",
+    "title": "ISSS626-QiuYan",
+    "section": "",
+    "text": "&lt;!DOCTYPE qgis PUBLIC ‘http://mrcc.com/qgis.dtd’ ‘SYSTEM’&gt;     \n\n\n       GEOGCRS[“WGS 84”,ENSEMBLE[“World Geodetic System 1984 ensemble”,MEMBER[“World Geodetic System 1984 (Transit)”],MEMBER[“World Geodetic System 1984 (G730)”],MEMBER[“World Geodetic System 1984 (G873)”],MEMBER[“World Geodetic System 1984 (G1150)”],MEMBER[“World Geodetic System 1984 (G1674)”],MEMBER[“World Geodetic System 1984 (G1762)”],MEMBER[“World Geodetic System 1984 (G2139)”],MEMBER[“World Geodetic System 1984 (G2296)”],ELLIPSOID[“WGS 84”,6378137,298.257223563,LENGTHUNIT[“metre”,1]],ENSEMBLEACCURACY[2.0]],PRIMEM[“Greenwich”,0,ANGLEUNIT[“degree”,0.0174532925199433]],CS[ellipsoidal,2],AXIS[“geodetic latitude (Lat)”,north,ORDER[1],ANGLEUNIT[“degree”,0.0174532925199433]],AXIS[“geodetic longitude (Lon)”,east,ORDER[2],ANGLEUNIT[“degree”,0.0174532925199433]],USAGE[SCOPE[“Horizontal component of 3D system.”],AREA[“World.”],BBOX[-90,-180,90,180]],ID[“EPSG”,4326]] +proj=longlat +datum=WGS84 +no_defs 3452 4326 EPSG:4326 WGS 84 longlat EPSG:7030 true"
   }
 ]
