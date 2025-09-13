@@ -12,7 +12,6 @@ execute:
   warning: false
 ---
 
-
 # 1 Overview
 
 Second-order spatial point pattern analysis examines the spatial relationships between points in a pattern, specifically focusing on how the presence of one point influences the location of others. It goes beyond simply describing the overall density of points (first-order effects) by investigating clustering, dispersion, or randomness at various spatial scales.
