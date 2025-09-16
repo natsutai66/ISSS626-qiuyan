@@ -13,10 +13,10 @@ execute:
 ##Loading the R packages
 
 ```{r}
-pacman::p_load(tidyverse, sf, tmap, httr)
+pacman::p_load(tidyverse, sf, tmap, httr, dplyr, ggplot2, patchwork)
 ```
 
-## Importing ACRA data
+## Importing and saving ACRA data
 
 ```{r}
 folder_path <- "data/aspatial/acra"
@@ -26,20 +26,57 @@ file_list <- list.files(path = folder_path,
 
 acra_data <- file_list %>%
   map_dfr(read_csv)
-```
 
-## Saving ACRA data
-
-```{r}
 write_rds(acra_data,
           "data/rds/acra_data.rds")
 ```
 
 ## Tidying ACRA data
 
-56111 is the type of business selected.
+4 types of business that related to Singaporean's lifestyle are selected:
+
+SSIC 93111 – Fitness centres and gymnasiums 
+
+SSIC 47711 – Retail sale of clothing for adults
+
+SSIC 56111 – Restaurants and Cafés
+
+SSIC 82303 – Event/Concert Organisers
 
 ```{r}
+#Fitness centres and gymnasiums 
+biz_93111 <- acra_data %>%
+  select(1:24) %>%
+  filter(primary_ssic_code == 93111) %>%
+  rename(date = registration_incorporation_date) %>%
+  mutate(date = as.Date(date),
+         YEAR = year(date),
+         MONTH_NUM = month(date),
+         MONTH_ABBR = month(date,
+                            label = TRUE,
+                            abbr = TRUE)) %>%
+  mutate(
+    postal_code = str_pad(postal_code, 
+    width = 6, side = "left", pad = "0")) %>% 
+           filter(date >= as.Date("2024-01-01") & date <= as.Date("2025-06-30"))
+
+#Retail sale of clothing for adults
+biz_47711 <- acra_data %>%
+  select(1:24) %>%
+  filter(primary_ssic_code == 47711) %>%
+  rename(date = registration_incorporation_date) %>%
+  mutate(date = as.Date(date),
+         YEAR = year(date),
+         MONTH_NUM = month(date),
+         MONTH_ABBR = month(date,
+                            label = TRUE,
+                            abbr = TRUE)) %>%
+  mutate(
+    postal_code = str_pad(postal_code, 
+    width = 6, side = "left", pad = "0")) %>% 
+           filter(date >= as.Date("2024-01-01") & date <= as.Date("2025-06-30"))
+
+#Restaurants and Cafés
 biz_56111 <- acra_data %>%
   select(1:24) %>%
   filter(primary_ssic_code == 56111) %>%
@@ -53,14 +90,133 @@ biz_56111 <- acra_data %>%
   mutate(
     postal_code = str_pad(postal_code, 
     width = 6, side = "left", pad = "0")) %>% 
-           filter(YEAR == 2025)
+           filter(date >= as.Date("2024-01-01") & date <= as.Date("2025-06-30"))
+
+#Event/Concert Organisers
+biz_82303 <- acra_data %>%
+  select(1:24) %>%
+  filter(primary_ssic_code == 82303) %>%
+  rename(date = registration_incorporation_date) %>%
+  mutate(date = as.Date(date),
+         YEAR = year(date),
+         MONTH_NUM = month(date),
+         MONTH_ABBR = month(date,
+                            label = TRUE,
+                            abbr = TRUE)) %>%
+  mutate(
+    postal_code = str_pad(postal_code, 
+    width = 6, side = "left", pad = "0")) %>% 
+           filter(date >= as.Date("2024-01-01") & date <= as.Date("2025-06-30"))
 ```
 
 ## Geocoding
 
 found: successfully geocoded not found: unsuccessfully geocoded
 
+::: panel-tabset
+
+## Fitness centres and gymnasiums 
+
 ```{r}
+#Geocoding
+postcodes <- unique(biz_93111$postal_code)
+
+url <- "https://onemap.gov.sg/api/common/elastic/search"
+
+found <- data.frame()
+not_found <- data.frame(postcode = character())
+
+for (pc in postcodes) {
+  query <- list(
+    searchVal = pc,
+    returnGeom = "Y",
+    getAddrDetails = "Y",
+    pageNum = "1"
+  )
+
+  res <- GET(url, query = query)
+  json <- content(res)
+  
+  if (json$found != 0) {
+    df <- as.data.frame(json$results, stringsAsFactors = FALSE)
+    df$input_postcode <- pc
+    found <- bind_rows(found, df)
+  } else {
+    not_found <- bind_rows(not_found, data.frame(postcode = pc))
+  }
+}
+
+#Tidying the geocoded data
+found <- found %>%
+  select(1:10)
+
+#Appending the location information
+biz_93111 = biz_93111 %>%
+  left_join(found,
+            by = c('postal_code' = 'POSTAL'))
+
+#Saving the data
+write_rds(biz_93111, "data/rds/biz_93111.rds")
+
+#Converting into SF data frame
+biz_93111_sf <- st_as_sf(biz_93111,
+                         coords = c("X", "Y"),
+                         crs = 3414)
+```
+
+## Retail sale of clothing for adults
+
+```{r}
+#Geocoding
+postcodes <- unique(biz_47711$postal_code)
+
+url <- "https://onemap.gov.sg/api/common/elastic/search"
+
+found <- data.frame()
+not_found <- data.frame(postcode = character())
+
+for (pc in postcodes) {
+  query <- list(
+    searchVal = pc,
+    returnGeom = "Y",
+    getAddrDetails = "Y",
+    pageNum = "1"
+  )
+
+  res <- GET(url, query = query)
+  json <- content(res)
+  
+  if (json$found != 0) {
+    df <- as.data.frame(json$results, stringsAsFactors = FALSE)
+    df$input_postcode <- pc
+    found <- bind_rows(found, df)
+  } else {
+    not_found <- bind_rows(not_found, data.frame(postcode = pc))
+  }
+}
+
+#Tidying the geocoded data
+found <- found %>%
+  select(1:10)
+
+#Appending the location information
+biz_47711 = biz_47711 %>%
+  left_join(found,
+            by = c('postal_code' = 'POSTAL'))
+
+#Saving the data
+write_rds(biz_47711, "data/rds/biz_47711.rds")
+
+#Converting into SF data frame
+biz_47711_sf <- st_as_sf(biz_47711,
+                         coords = c("X", "Y"),
+                         crs = 3414)
+```
+
+## Restaurants and Cafés
+
+```{r}
+#Geocoding
 postcodes <- unique(biz_56111$postal_code)
 
 url <- "https://onemap.gov.sg/api/common/elastic/search"
@@ -87,50 +243,133 @@ for (pc in postcodes) {
     not_found <- bind_rows(not_found, data.frame(postcode = pc))
   }
 }
-```
 
-## Tidying the geocoded data
-
-```{r}
+#Tidying the geocoded data
 found <- found %>%
   select(1:10)
-```
 
-## Appending the location information
-
-```{r}
+#Appending the location information
 biz_56111 = biz_56111 %>%
   left_join(found,
             by = c('postal_code' = 'POSTAL'))
-```
 
-## Saving the data
-
-```{r}
+#Saving the data
 write_rds(biz_56111, "data/rds/biz_56111.rds")
-```
 
-## Converting into SF data frame
-
-```{r}
+#Converting into SF data frame
 biz_56111_sf <- st_as_sf(biz_56111,
                          coords = c("X", "Y"),
                          crs = 3414)
 ```
 
-## Visualising the distribution
+#Event/Concert Organisers
 
 ```{r}
-ggplot(data = biz_56111,
-       aes(x = MONTH_ABBR)) +
-  geom_bar()
+#Geocoding
+postcodes <- unique(biz_82303$postal_code)
+
+url <- "https://onemap.gov.sg/api/common/elastic/search"
+
+found <- data.frame()
+not_found <- data.frame(postcode = character())
+
+for (pc in postcodes) {
+  query <- list(
+    searchVal = pc,
+    returnGeom = "Y",
+    getAddrDetails = "Y",
+    pageNum = "1"
+  )
+
+  res <- GET(url, query = query)
+  json <- content(res)
+  
+  if (json$found != 0) {
+    df <- as.data.frame(json$results, stringsAsFactors = FALSE)
+    df$input_postcode <- pc
+    found <- bind_rows(found, df)
+  } else {
+    not_found <- bind_rows(not_found, data.frame(postcode = pc))
+  }
+}
+
+#Tidying the geocoded data
+found <- found %>%
+  select(1:10)
+
+#Appending the location information
+biz_82303 = biz_82303 %>%
+  left_join(found,
+            by = c('postal_code' = 'POSTAL'))
+
+#Saving the data
+write_rds(biz_82303, "data/rds/biz_82303.rds")
+
+#Converting into SF data frame
+biz_82303_sf <- st_as_sf(biz_82303,
+                         coords = c("X", "Y"),
+                         crs = 3414)
 ```
+
+:::
+
+## Visualising the distribution
+
+```{r fig.width=10, fig.height=6}
+plot_monthly <- function(df, title_text, fill_color) {
+  df %>%
+    filter(date >= as.Date("2024-01-01") & date <= as.Date("2025-06-30")) %>%
+    mutate(MonthYear = format(date, "%b %Y")) %>%
+    mutate(MonthYear = factor(MonthYear, 
+                              levels = format(seq(as.Date("2024-01-01"),
+                                                  as.Date("2025-06-01"),
+                                                  by = "1 month"), "%b %Y"),
+                              ordered = TRUE)) %>%
+    ggplot(aes(x = MonthYear)) +
+    geom_bar(fill = fill_color) +   # use passed colour
+    labs(
+      title = title_text,
+      x = "Month-Year",
+      y = "Number of registrations"
+    ) +
+    ylim(0, 150) +
+    theme_minimal() +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      plot.title = element_text(hjust = 0.5, size = 13, face = "bold")
+    )
+}
+
+# Assign unique colours
+p1 <- plot_monthly(biz_93111, "Distribution of Fitness Centres and Gymnasiums", "lightsteelblue")
+p2 <- plot_monthly(biz_47711, "Distribution of Retail Sale of Clothing for Adults", "moccasin")
+p3 <- plot_monthly(biz_56111, "Distribution of Restaurants and Cafés", "palegreen3")
+p4 <- plot_monthly(biz_82303, "Distribution of Event/Concert Organisers", "plum2")
+
+# Combine 2×2
+(p1 + p2) / (p3 + p4)
+```
+
 
 ## Visualising the business
 
 ```{r}
 tmap_mode('view')
-tm_shape(biz_56111_sf)+
+tm_shape(biz_93111_sf)+
   tm_dots()
 ```
+```{r}
+tmap_mode("view")
 
+tm_shape(biz_93111_sf) +
+  tm_dots(col = "blue", size = 0.15, alpha = 0.7, id = "entity_name", legend.show = TRUE) +
+tm_shape(biz_47711_sf) +
+  tm_dots(col = "orange", size = 0.15, alpha = 0.7, id = "entity_name", legend.show = TRUE) +
+tm_shape(biz_56111_sf) +
+  tm_dots(col = "green", size = 0.15, alpha = 0.7, id = "entity_name", legend.show = TRUE) +
+tm_shape(biz_82303_sf) +
+  tm_dots(col = "purple", size = 0.15, alpha = 0.7, id = "entity_name", legend.show = TRUE) +
+tm_layout(legend.outside = TRUE,
+          legend.title.size = 1.2,
+          legend.text.size = 0.9)
+```
