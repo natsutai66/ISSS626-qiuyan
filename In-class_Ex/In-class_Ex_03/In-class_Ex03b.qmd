@@ -1,5 +1,5 @@
 ---
-title: "Take home exercise 1"
+title: "In class exercise 3"
 author: "Tai Qiu Yan"
 date: "September 12, 2025"
 date-modified: "last-modified"
@@ -94,7 +94,6 @@ biz_56111 = biz_56111 %>%
   left_join(found,
             by = c('postal_code' = 'POSTAL'))
 ```
-
 
 ## Saving the data
 
