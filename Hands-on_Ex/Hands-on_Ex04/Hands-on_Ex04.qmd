@@ -13,7 +13,6 @@ execute:
   freeze: true
 ---
 
-
 # 1 Overview
 
 In this hands-on exercise, you will learn how to compute spatial weights using R. By the end to this hands-on exercise, you will be able to:
