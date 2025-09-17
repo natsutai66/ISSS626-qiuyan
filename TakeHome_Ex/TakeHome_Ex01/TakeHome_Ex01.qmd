@@ -10,13 +10,17 @@ execute:
   freeze: true
 ---
 
-##Loading the R packages
+# 1 Loading the R packages
 
 ```{r}
-pacman::p_load(tidyverse, sf, tmap, httr, dplyr, ggplot2, patchwork)
+pacman::p_load(tidyverse, sf, tmap, httr, 
+               dplyr, ggplot2, patchwork, 
+               terra, spatstat, rvest)
 ```
 
-## Importing and saving ACRA data
+# 2 Data Importing and Wrangling
+
+## 2.1 Importing and saving ACRA data
 
 ```{r}
 folder_path <- "data/aspatial/acra"
@@ -31,7 +35,7 @@ write_rds(acra_data,
           "data/rds/acra_data.rds")
 ```
 
-## Tidying ACRA data
+## 2.2 Tidying ACRA data
 
 4 types of business that related to Singaporean's lifestyle are selected:
 
@@ -109,13 +113,13 @@ biz_82303 <- acra_data %>%
            filter(date >= as.Date("2024-01-01") & date <= as.Date("2025-06-30"))
 ```
 
-## Geocoding
+## 2.3 Geocoding
 
 found: successfully geocoded not found: unsuccessfully geocoded
 
 ::: panel-tabset
 
-## Fitness centres and gymnasiums 
+### Fitness centres and gymnasiums 
 
 ```{r}
 #Geocoding
@@ -164,7 +168,7 @@ biz_93111_sf <- st_as_sf(biz_93111,
                          crs = 3414)
 ```
 
-## Retail sale of clothing for adults
+### Retail sale of clothing for adults
 
 ```{r}
 #Geocoding
@@ -213,7 +217,7 @@ biz_47711_sf <- st_as_sf(biz_47711,
                          crs = 3414)
 ```
 
-## Restaurants and Cafés
+### Restaurants and Cafés
 
 ```{r}
 #Geocoding
@@ -262,7 +266,7 @@ biz_56111_sf <- st_as_sf(biz_56111,
                          crs = 3414)
 ```
 
-#Event/Concert Organisers
+###Event/Concert Organisers
 
 ```{r}
 #Geocoding
@@ -313,7 +317,7 @@ biz_82303_sf <- st_as_sf(biz_82303,
 
 :::
 
-## Visualising the distribution
+### 2.3.1 Visualising the distribution
 
 ```{r fig.width=10, fig.height=6}
 plot_monthly <- function(df, title_text, fill_color) {
@@ -341,35 +345,156 @@ plot_monthly <- function(df, title_text, fill_color) {
 }
 
 # Assign unique colours
-p1 <- plot_monthly(biz_93111, "Distribution of Fitness Centres and Gymnasiums", "lightsteelblue")
-p2 <- plot_monthly(biz_47711, "Distribution of Retail Sale of Clothing for Adults", "moccasin")
-p3 <- plot_monthly(biz_56111, "Distribution of Restaurants and Cafés", "palegreen3")
-p4 <- plot_monthly(biz_82303, "Distribution of Event/Concert Organisers", "plum2")
+p1 <- plot_monthly(biz_93111, "Distribution of Fitness Centres and Gymnasiums", "#a6cee3")
+p2 <- plot_monthly(biz_47711, "Distribution of Retail Sale of Clothing for Adults", "#fb9a99")
+p3 <- plot_monthly(biz_56111, "Distribution of Restaurants and Cafés", "#b2df8a")
+p4 <- plot_monthly(biz_82303, "Distribution of Event/Concert Organisers", "#fdbf6f")
 
 # Combine 2×2
 (p1 + p2) / (p3 + p4)
 ```
 
 
-## Visualising the business
+### 2.3.2 Visualising the business
 
-```{r}
-tmap_mode('view')
-tm_shape(biz_93111_sf)+
-  tm_dots()
-```
 ```{r}
 tmap_mode("view")
 
 tm_shape(biz_93111_sf) +
-  tm_dots(col = "blue", size = 0.15, alpha = 0.7, id = "entity_name", legend.show = TRUE) +
+  tm_dots(col = "#1f78b4", size = 0.15, alpha = 0.7, id = "entity_name", legend.show = TRUE) +
 tm_shape(biz_47711_sf) +
-  tm_dots(col = "orange", size = 0.15, alpha = 0.7, id = "entity_name", legend.show = TRUE) +
+  tm_dots(col = "#e31a1c", size = 0.15, alpha = 0.7, id = "entity_name", legend.show = TRUE) +
 tm_shape(biz_56111_sf) +
-  tm_dots(col = "green", size = 0.15, alpha = 0.7, id = "entity_name", legend.show = TRUE) +
+  tm_dots(col = "#33a02c", size = 0.15, alpha = 0.7, id = "entity_name", legend.show = TRUE) +
 tm_shape(biz_82303_sf) +
-  tm_dots(col = "purple", size = 0.15, alpha = 0.7, id = "entity_name", legend.show = TRUE) +
+  tm_dots(col = "#ff7f00", size = 0.15, alpha = 0.7, id = "entity_name", legend.show = TRUE) +
 tm_layout(legend.outside = TRUE,
           legend.title.size = 1.2,
           legend.text.size = 0.9)
 ```
+
+## 2.4 Creating owin object
+
+```{r}
+mpsz_sf <- st_read("data/geospatial/MasterPlan2019SubzoneBoundaryNoSeaKML.kml") %>% 
+  st_zm(drop = TRUE, what = "ZM") %>% st_transform(crs = 3414)
+
+extract_kml_field <- function(html_text, field_name) {
+  if (is.na(html_text) || html_text == "") return(NA_character_)
+  
+  page <- read_html(html_text)
+  rows <- page %>% html_elements("tr")
+  
+  value <- rows %>%
+    keep(~ html_text2(html_element(.x, "th")) == field_name) %>%
+    html_element("td") %>%
+    html_text2()
+  
+  if (length(value) == 0) NA_character_ else value
+}
+
+mpsz_sf <- mpsz_sf %>%
+  mutate(
+    REGION_N = map_chr(Description, extract_kml_field, "REGION_N"),
+    PLN_AREA_N = map_chr(Description, extract_kml_field, "PLN_AREA_N"),
+    SUBZONE_N = map_chr(Description, extract_kml_field, "SUBZONE_N"),
+    SUBZONE_C = map_chr(Description, extract_kml_field, "SUBZONE_C")
+  ) %>%
+  select(-Name, -Description) %>%
+  relocate(geometry, .after = last_col())
+
+mpsz_cl <- mpsz_sf %>%
+  filter(SUBZONE_N != "SOUTHERN GROUP",
+         PLN_AREA_N != "WESTERN ISLANDS",
+         PLN_AREA_N != "NORTH-EASTERN ISLANDS")
+
+write_rds(mpsz_cl, 
+          "data/rds/mpsz_cl.rds")
+
+sg_owin <- as.owin(mpsz_cl)
+```
+
+## 2.5 Combining point events object and owin object
+
+```{r}
+# Converting sf data frames to ppp class
+biz_93111_ppp <- as.ppp(biz_93111_sf)
+biz_47711_ppp <- as.ppp(biz_47711_sf)
+biz_56111_ppp <- as.ppp(biz_56111_sf)
+biz_82303_ppp <- as.ppp(biz_82303_sf)
+
+# Combine
+biz_93111_ppp = biz_93111_ppp[sg_owin]
+biz_47711_ppp = biz_47711_ppp[sg_owin]
+biz_56111_ppp = biz_56111_ppp[sg_owin]
+biz_82303_ppp = biz_82303_ppp[sg_owin]
+```
+
+
+# 3 Analysis of Fitness centres and gymnasiums 
+
+## 3.1 Clark-Evans test with CSR
+
+The test hypotheses are:
+
+Ho = The distribution of Fitness centres and gymnasiums are randomly distributed.
+
+H1= The distribution of Fitness centres and gymnasiums are not randomly distributed.
+
+The 95% confident interval will be used.
+
+```{r}
+clarkevans.test(biz_93111_ppp,
+                correction="none",
+                clipregion="sg_owin",
+                alternative=c("clustered"),
+                method="MonteCarlo",
+                nsim=99)
+```
+Since p<0.05, we reject the null hypothesis (H0), and conclude that the distribution of Fitness centres and gymnasiums is significantly clustered.
+
+## 3.2 Kernel Density Estimation Method
+
+bw.ppl() algorithm is used as it tends to produce the more appropriate values when the pattern consists predominantly of tight clusters.
+
+```{r}
+# convert into km
+biz_93111_ppp_km <- rescale.ppp(
+  biz_93111_ppp, 1000, "km")
+
+kde_biz_93111_km <- density(biz_93111_ppp_km,
+                              sigma=bw.ppl,
+                              edge=TRUE,
+                              kernel="gaussian")
+
+# Convert into raster
+kde_93111_bw_terra <- rast(kde_biz_93111_km)
+
+# Assign projection systems
+crs(kde_93111_bw_terra) <- "EPSG:3414"
+
+kde_93111_bw_terra
+```
+
+```{r}
+tmap_mode('plot')
+
+tm_shape(kde_93111_bw_terra) + 
+  tm_raster(col.scale = 
+              tm_scale_continuous(
+                values = "viridis"),
+            col.legend = tm_legend(
+            title = "Density values",
+            title.size = 0.7,
+            text.size = 0.7,
+            bg.color = "white",
+            bg.alpha = 0.7,
+            position = tm_pos_in(
+              "right", "bottom"),
+            frame = TRUE)) +
+  tm_graticules(labels.size = 0.7) +
+  tm_compass() +
+  tm_layout(main.title = "KDE of Fitness Centres and Gymnasiums",
+            scale = 1.0)
+```
+
