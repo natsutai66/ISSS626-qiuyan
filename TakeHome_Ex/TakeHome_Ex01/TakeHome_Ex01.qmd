@@ -475,34 +475,48 @@ Overall, the distribution highlights Singapore’s mixed pattern of decentralise
 # 4 Analysis of Fitness centres and gymnasiums 
 
 ```{r}
-# 1. Count number of businesses (93111) in each subzone
+# Count number of businesses in each subzone
 biz_count_93111 <- biz_93111_sf %>%
   st_join(mpsz_cl, join = st_within) %>%   # assign each business point to subzone
   st_drop_geometry() %>%
   group_by(SUBZONE_N) %>%
   summarise(count = n())                   # count businesses per subzone
 
-# 2. Join count back to subzone polygons
+# Join count back to subzone polygons
 mpsz_biz93111 <- mpsz_cl %>%
   left_join(biz_count_93111, by = "SUBZONE_N")
 
-# 3. Plot choropleth map (static)
+# Identify outliers by boxplot rule
+stats_cnt    <- boxplot.stats(mpsz_biz93111$count)
+outlier_vals <- stats_cnt$out
+outlier_sf   <- mpsz_biz93111 %>% filter(count %in% outlier_vals)
+outlier_lbl <- st_point_on_surface(outlier_sf)
+
+# Plot
 tmap_mode("plot")
 
 tm_shape(mpsz_biz93111) + 
   tm_polygons(fill = "count", 
               fill.scale = tm_scale_intervals(
-                style = "quantile",  # classify by quantiles
-                n = 5,
-                values = "brewer.blues"), # blue shades
+                style = "quantile", 
+                n = 4,
+                values = "brewer.blues"), 
               fill.legend = tm_legend(
-                title = "No. of Fitness Centres\n& Gymnasiums")) +
+                title = "Count"),
+              fill.chart = tm_chart_box()) +
   tm_borders(fill_alpha = 0.5) +
+  tm_shape(outlier_sf) +
+    tm_borders(col = "#000000", lwd = 2) +
+  tm_shape(outlier_lbl) +
   tm_compass(type="8star", size = 2) +
-  tm_scalebar() +
-  tm_grid(lwd = 0.1, alpha = 0.2) +
   tm_layout(main.title = "Distribution of Fitness Centres & Gymnasiums by Subzone")
 ```
+
+The choropleth map shows the distribution of fitness centres and gymnasiums across Singapore subzones. Most subzones have only a few establishments, typically between 1 and 4, as reflected by the lighter shades of blue. 
+
+However, a few subzones highlighted with thick black borders stand out as outliers, recording significantly higher counts of up to 22. These outlier subzones are mainly concentrated in central and eastern Singapore, areas that coincide with high-density residential, commercial, and lifestyle hubs. The clustering of fitness centres in these zones reflects strong demand driven by population density, higher disposable incomes, and vibrant urban activity. Conversely, peripheral and industrial subzones show sparse or no fitness centres, suggesting limited accessibility for residents in those areas. 
+
+Overall, the map highlights spatial inequality in the availability of fitness facilities, with clear hotspots in key urban subzones while many regions remain underserved, indicating potential gaps in accessibility and business opportunities.
 
 ## 4.1 First-order Spatial Point Patterns Analysis
 
@@ -672,7 +686,52 @@ Finally, the L-function, a stabilized version of K, reinforces this pattern with
 
 Overall, fitness centres in Singapore are unevenly distributed: concentrated in lifestyle and commercial hubs, while leaving some subzones relatively underserved.
 
+
 # 5 Analysis of Retail sale of clothing for adults
+
+```{r}
+# Count number of businesses in each subzone
+biz_count_47711 <- biz_47711_sf %>%
+  st_join(mpsz_cl, join = st_within) %>%   # assign each business point to subzone
+  st_drop_geometry() %>%
+  group_by(SUBZONE_N) %>%
+  summarise(count = n())                   # count businesses per subzone
+
+# Join count back to subzone polygons
+mpsz_biz47711 <- mpsz_cl %>%
+  left_join(biz_count_47711, by = "SUBZONE_N")
+
+# Identify outliers by boxplot rule
+stats_cnt    <- boxplot.stats(mpsz_biz47711$count)
+outlier_vals <- stats_cnt$out
+outlier_sf   <- mpsz_biz47711 %>% filter(count %in% outlier_vals)
+outlier_lbl <- st_point_on_surface(outlier_sf)
+
+# Plot
+tmap_mode("plot")
+
+tm_shape(mpsz_biz47711) + 
+  tm_polygons(fill = "count", 
+              fill.scale = tm_scale_intervals(
+                style = "quantile", 
+                n = 4,
+                values = "brewer.reds"), 
+              fill.legend = tm_legend(
+                title = "Count"),
+              fill.chart = tm_chart_box()) +
+  tm_borders(fill_alpha = 0.5) +
+  tm_shape(outlier_sf) +
+    tm_borders(col = "#000000", lwd = 2) +
+  tm_shape(outlier_lbl) +
+  tm_compass(type="8star", size = 2) +
+  tm_layout(main.title = "Distribution of Retail sale of clothing for adults")
+```
+
+The map illustrates the distribution of retail businesses selling clothing for adults across Singapore subzones. Most areas record modest counts between 1 and 5 outlets, indicated by lighter shades of red. 
+
+However, subzones highlighted with thick black borders stand out as outliers, with counts as high as 51. These outlier subzones are concentrated in central, eastern, and some northern regions, which align with major commercial hubs, town centres, and high-density residential zones. The clustering pattern reflects strong consumer demand and the tendency for clothing retailers to establish in areas with heavy foot traffic, such as malls, shopping belts, and transportation nodes. In contrast, peripheral or industrial subzones display minimal activity, highlighting unequal accessibility to fashion retail. 
+
+Overall, the map shows that adult clothing retail is not evenly distributed but heavily concentrated in a few urban subzones, reinforcing the role of retail hotspots while also exposing underserved areas.
 
 ## 5.1 First-order Spatial Point Patterns Analysis
 
@@ -775,8 +834,6 @@ plot(L_47711, . - r ~ r,
      main = "L-function")
 ```
 
-The output of retail sale of clothing for adults indicates a clear clustering pattern. 
-
 The G-function shows that the observed nearest-neighbor distances are much shorter than expected under complete spatial randomness (CSR), meaning outlets tend to locate close together. 
 
 The F-function lies below the CSR curve, suggesting that from random locations, clothing stores are generally farther away than under randomness, highlighting gaps between concentrated retail hubs. 
@@ -827,7 +884,52 @@ plot(L_47711.csr, . - r ~ r,
      xlab = "d (m)", ylab = "L(d) - r")
 ```
 
+
 # 6 Analysis of Restaurants and Cafés
+
+```{r}
+# Count number of businesses in each subzone
+biz_count_56111 <- biz_56111_sf %>%
+  st_join(mpsz_cl, join = st_within) %>%   # assign each business point to subzone
+  st_drop_geometry() %>%
+  group_by(SUBZONE_N) %>%
+  summarise(count = n())                   # count businesses per subzone
+
+# Join count back to subzone polygons
+mpsz_biz56111 <- mpsz_cl %>%
+  left_join(biz_count_56111, by = "SUBZONE_N")
+
+# Identify outliers by boxplot rule
+stats_cnt    <- boxplot.stats(mpsz_biz56111$count)
+outlier_vals <- stats_cnt$out
+outlier_sf   <- mpsz_biz56111 %>% filter(count %in% outlier_vals)
+outlier_lbl <- st_point_on_surface(outlier_sf)
+
+# Plot
+tmap_mode("plot")
+
+tm_shape(mpsz_biz56111) + 
+  tm_polygons(fill = "count", 
+              fill.scale = tm_scale_intervals(
+                style = "quantile", 
+                n = 4,
+                values = "brewer.greens"), 
+              fill.legend = tm_legend(
+                title = "Count"),
+              fill.chart = tm_chart_box()) +
+  tm_borders(fill_alpha = 0.5) +
+  tm_shape(outlier_sf) +
+    tm_borders(col = "#000000", lwd = 2) +
+  tm_shape(outlier_lbl) +
+  tm_compass(type="8star", size = 2) +
+  tm_layout(main.title = "Distribution of Restaurants and Cafés")
+```
+
+The map shows the distribution of restaurants and cafés across Singapore subzones. Most areas host between 1 and 9 establishments, reflected in lighter shades of green. 
+
+However, subzones highlighted with thick black borders stand out as outliers, with counts reaching up to 84. These high-density clusters are primarily concentrated in central regions and selected eastern areas, coinciding with Singapore’s major commercial, entertainment, and lifestyle hubs. The concentration reflects strong consumer demand, urban vibrancy, and proximity to transport networks, which attract food and beverage businesses. Peripheral or less populated areas display sparse distribution, indicating limited accessibility to such amenities. 
+
+Overall, the pattern reveals significant clustering of restaurants and cafés in key urban centres, supporting their role as social and commercial anchors while also highlighting spatial disparities, as residents in outlying areas may face fewer choices. This distribution underlines the importance of urban planning to balance accessibility and commercial concentration.
 
 ## 6.1 First-order Spatial Point Patterns Analysis
 
@@ -930,6 +1032,16 @@ plot(L_56111, . - r ~ r,
      main = "L-function")
 ```
 
+The G-function rises steeply above the theoretical Poisson curve, showing that restaurants and cafés are located much closer together than expected under complete spatial randomness. 
+
+The F-function also lies above the CSR line, indicating that empty spaces between restaurants and cafés are smaller than random expectation, further confirming clustering. 
+
+The K-function shows observed values consistently above the theoretical curve, suggesting significant clustering across multiple distance scales, with intensity increasing as distance grows. 
+
+Similarly, the L-function is well above the CSR baseline, reinforcing the strong clustering effect across Singapore.
+
+Overall, these results indicate that Restaurants and Cafés are not randomly distributed but heavily concentrated in specific subzones.
+
 ### 6.2.2 Complete Spatial Randomness Test
 
 To confirm the observed spatial patterns above, a hypothesis test will be conducted. The hypothesis and test are as follows:
@@ -970,7 +1082,52 @@ plot(L_56111.csr, . - r ~ r,
      xlab = "d (m)", ylab = "L(d) - r")
 ```
 
+
 # 7 Analysis of Event/Concert Organisers
+
+```{r}
+# Count number of businesses in each subzone
+biz_count_82303 <- biz_82303_sf %>%
+  st_join(mpsz_cl, join = st_within) %>%   # assign each business point to subzone
+  st_drop_geometry() %>%
+  group_by(SUBZONE_N) %>%
+  summarise(count = n())                   # count businesses per subzone
+
+# Join count back to subzone polygons
+mpsz_biz82303 <- mpsz_cl %>%
+  left_join(biz_count_56111, by = "SUBZONE_N")
+
+# Identify outliers by boxplot rule
+stats_cnt    <- boxplot.stats(mpsz_biz82303$count)
+outlier_vals <- stats_cnt$out
+outlier_sf   <- mpsz_biz82303 %>% filter(count %in% outlier_vals)
+outlier_lbl <- st_point_on_surface(outlier_sf)
+
+# Plot
+tmap_mode("plot")
+
+tm_shape(mpsz_biz82303) + 
+  tm_polygons(fill = "count", 
+              fill.scale = tm_scale_intervals(
+                style = "quantile", 
+                n = 4,
+                values = "brewer.oranges"), 
+              fill.legend = tm_legend(
+                title = "Count"),
+              fill.chart = tm_chart_box()) +
+  tm_borders(fill_alpha = 0.5) +
+  tm_shape(outlier_sf) +
+    tm_borders(col = "#000000", lwd = 2) +
+  tm_shape(outlier_lbl) +
+  tm_compass(type="8star", size = 2) +
+  tm_layout(main.title = "Distribution of Event/Concert Organisers")
+```
+
+The map illustrates the distribution of event and concert organisers across Singapore’s subzones. Most areas host between 1 and 9 organisers, shown in lighter shades of orange. 
+
+However, several subzones highlighted with thick black borders are identified as outliers, with significantly higher counts reaching up to 84. These outliers are concentrated in the central and eastern regions, reflecting Singapore’s role as a hub for large-scale events, exhibitions, and entertainment industries. Their presence in these zones aligns with strong infrastructure, accessibility, and high population density, which are crucial for sustaining event-related businesses. In contrast, peripheral and residential areas display sparse or minimal presence, underscoring uneven distribution. 
+
+Overall, the map reveals that event and concert organisers cluster in established commercial and cultural centres, benefiting from higher demand and facilities. This highlights both the centralisation of the industry and the potential accessibility gap for residents in outer subzones.
 
 ## 7.1 First-order Spatial Point Patterns Analysis
 
@@ -1073,6 +1230,16 @@ plot(L_82303, . - r ~ r,
      ylab = "L(d) - r", xlab = "d (m)",
      main = "L-function")
 ```
+
+The G-function rises steeply above the theoretical Poisson curve, meaning that nearest-neighbour distances are shorter than expected, consistent with clustering at small spatial scales. 
+
+The F-function also lies above the Poisson expectation, showing that random locations are on average closer to an organiser than if the distribution were random, again confirming clustering.
+
+The K-function increases more rapidly than the Poisson benchmark, with the observed curve well above the theoretical line. This indicates that at larger distances, there are consistently more Event/Concert Organisers than would be expected under complete spatial randomness. 
+
+The L-function, a variance-stabilised version of the K-function, also lies far above the theoretical expectation, providing further evidence of clustering across multiple scales.
+
+Overall, the results show that Event/Concert Organisers in Singapore are spatially clustered, particularly around key central and commercial hubs, reflecting strong demand in high-density urban areas.
 
 ### 7.2.2 Complete Spatial Randomness Test
 
