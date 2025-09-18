@@ -317,62 +317,6 @@ biz_82303_sf <- st_as_sf(biz_82303,
 
 :::
 
-### 2.3.1 Visualising the distribution
-
-```{r fig.width=10, fig.height=6}
-plot_monthly <- function(df, title_text, fill_color) {
-  df %>%
-    filter(date >= as.Date("2024-01-01") & date <= as.Date("2025-06-30")) %>%
-    mutate(MonthYear = format(date, "%b %Y")) %>%
-    mutate(MonthYear = factor(MonthYear, 
-                              levels = format(seq(as.Date("2024-01-01"),
-                                                  as.Date("2025-06-01"),
-                                                  by = "1 month"), "%b %Y"),
-                              ordered = TRUE)) %>%
-    ggplot(aes(x = MonthYear)) +
-    geom_bar(fill = fill_color) +   # use passed colour
-    labs(
-      title = title_text,
-      x = "Month-Year",
-      y = "Number of registrations"
-    ) +
-    ylim(0, 150) +
-    theme_minimal() +
-    theme(
-      axis.text.x = element_text(angle = 45, hjust = 1),
-      plot.title = element_text(hjust = 0.5, size = 13, face = "bold")
-    )
-}
-
-# Assign unique colours
-p1 <- plot_monthly(biz_93111, "Distribution of Fitness Centres and Gymnasiums", "#a6cee3")
-p2 <- plot_monthly(biz_47711, "Distribution of Retail Sale of Clothing for Adults", "#fb9a99")
-p3 <- plot_monthly(biz_56111, "Distribution of Restaurants and Cafés", "#b2df8a")
-p4 <- plot_monthly(biz_82303, "Distribution of Event/Concert Organisers", "#fdbf6f")
-
-# Combine 2×2
-(p1 + p2) / (p3 + p4)
-```
-
-
-### 2.3.2 Visualising the business
-
-```{r}
-tmap_mode("view")
-
-tm_shape(biz_93111_sf) +
-  tm_dots(col = "#1f78b4", size = 0.15, alpha = 0.7, id = "entity_name", legend.show = TRUE) +
-tm_shape(biz_47711_sf) +
-  tm_dots(col = "#e31a1c", size = 0.15, alpha = 0.7, id = "entity_name", legend.show = TRUE) +
-tm_shape(biz_56111_sf) +
-  tm_dots(col = "#33a02c", size = 0.15, alpha = 0.7, id = "entity_name", legend.show = TRUE) +
-tm_shape(biz_82303_sf) +
-  tm_dots(col = "#ff7f00", size = 0.15, alpha = 0.7, id = "entity_name", legend.show = TRUE) +
-tm_layout(legend.outside = TRUE,
-          legend.title.size = 1.2,
-          legend.text.size = 0.9)
-```
-
 ## 2.4 Creating owin object
 
 ```{r}
@@ -418,10 +362,25 @@ sg_owin <- as.owin(mpsz_cl)
 
 ```{r}
 # Converting sf data frames to ppp class
-biz_93111_ppp <- as.ppp(biz_93111_sf)
-biz_47711_ppp <- as.ppp(biz_47711_sf)
-biz_56111_ppp <- as.ppp(biz_56111_sf)
-biz_82303_ppp <- as.ppp(biz_82303_sf)
+biz_93111_ppp <- as.ppp(biz_93111_sf) %>%
+  rjitter(retry = TRUE,
+          nsim = 1,
+          drop = TRUE)
+
+biz_47711_ppp <- as.ppp(biz_47711_sf) %>%
+  rjitter(retry = TRUE,
+          nsim = 1,
+          drop = TRUE)
+
+biz_56111_ppp <- as.ppp(biz_56111_sf) %>%
+  rjitter(retry = TRUE,
+          nsim = 1,
+          drop = TRUE)
+
+biz_82303_ppp <- as.ppp(biz_82303_sf) %>%
+  rjitter(retry = TRUE,
+          nsim = 1,
+          drop = TRUE)
 
 # Combine
 biz_93111_ppp = biz_93111_ppp[sg_owin]
@@ -430,10 +389,124 @@ biz_56111_ppp = biz_56111_ppp[sg_owin]
 biz_82303_ppp = biz_82303_ppp[sg_owin]
 ```
 
+# 3 Business Overview
 
-# 3 Analysis of Fitness centres and gymnasiums 
+## Visualising the distribution
 
-## 3.1 Clark-Evans test with CSR
+```{r fig.width=10, fig.height=6}
+plot_monthly <- function(df, title_text, fill_color) {
+  df %>%
+    filter(date >= as.Date("2024-01-01") & date <= as.Date("2025-06-30")) %>%
+    mutate(MonthYear = format(date, "%b %Y")) %>%
+    mutate(MonthYear = factor(MonthYear, 
+                              levels = format(seq(as.Date("2024-01-01"),
+                                                  as.Date("2025-06-01"),
+                                                  by = "1 month"), "%b %Y"),
+                              ordered = TRUE)) %>%
+    ggplot(aes(x = MonthYear)) +
+    geom_bar(fill = fill_color) +   # use passed colour
+    labs(
+      title = title_text,
+      x = "Month-Year",
+      y = "Number of registrations"
+    ) +
+    ylim(0, 150) +
+    theme_minimal() +
+    theme(
+      axis.text.x = element_text(angle = 45, hjust = 1),
+      plot.title = element_text(hjust = 0.5, size = 13, face = "bold")
+    )
+}
+
+# Assign unique colours
+p1 <- plot_monthly(biz_93111, "Distribution of Fitness Centres and Gymnasiums", "#a6cee3")
+p2 <- plot_monthly(biz_47711, "Distribution of Retail Sale of Clothing for Adults", "#fb9a99")
+p3 <- plot_monthly(biz_56111, "Distribution of Restaurants and Cafés", "#b2df8a")
+p4 <- plot_monthly(biz_82303, "Distribution of Event/Concert Organisers", "#fdbf6f")
+
+# Combine 2×2
+(p1 + p2) / (p3 + p4)
+```
+
+The registration trends of the four business types between January 2024 and June 2025 reveal distinct patterns.
+
+Fitness Centres and Gymnasiums show relatively low and fluctuating registrations, with occasional peaks, suggesting niche but growing demand. 
+
+Retail Clothing Stores maintain a steady level of registrations across the period, reflecting stable consumer demand for fashion and apparel. 
+
+Restaurants and Cafés record the highest number of registrations, with clear peaks in early and mid-2024, indicating strong entrepreneurial activity and consistent demand in the food and beverage sector. 
+
+Event and Concert Organisers display moderate but slightly declining registrations over time, possibly influenced by market saturation or economic constraints on entertainment services. 
+
+Overall, the distribution highlights food services as the most vibrant and rapidly expanding sector, while retail clothing remains steady, fitness shows sporadic growth, and events demonstrate more cautious or stabilising entry into the market.
+
+## Visualising the business
+
+```{r}
+tmap_mode("view")
+
+tm_shape(biz_93111_sf) +
+  tm_dots(col = "#1f78b4", size = 0.3, alpha = 0.7, id = "entity_name", legend.show = TRUE) +
+tm_shape(biz_47711_sf) +
+  tm_dots(col = "#e31a1c", size = 0.3, alpha = 0.7, id = "entity_name", legend.show = TRUE) +
+tm_shape(biz_56111_sf) +
+  tm_dots(col = "#33a02c", size = 0.3, alpha = 0.7, id = "entity_name", legend.show = TRUE) +
+tm_shape(biz_82303_sf) +
+  tm_dots(col = "#ff7f00", size = 0.3, alpha = 0.7, id = "entity_name", legend.show = TRUE) +
+tm_layout(legend.outside = TRUE,
+          legend.title.size = 1.2,
+          legend.text.size = 0.9) +
+tm_view(set_zoom_limits = c(12,16))
+```
+
+The spatial distribution of the four business types reveals clear urban concentration patterns in Singapore. 
+
+Fitness Centres and Gymnasiums (blue dots) are fairly dispersed but cluster in residential towns, reflecting demand for convenient access to health and fitness services. 
+
+Retail Clothing Stores (red dots) are more heavily concentrated in central areas, particularly the downtown core and major commercial hubs, where shopping malls dominate. 
+
+Restaurants and Cafés (green dots) appear densely concentrated in the central and eastern regions, aligning with lifestyle clusters and dining districts, while still maintaining a widespread presence across neighborhoods. 
+
+Event and Concert Organisers (orange dots) are concentrated in the city centre and selected regional nodes, close to major venues and transport links. 
+
+Overall, the distribution highlights Singapore’s mixed pattern of decentralised services for daily needs, such as gyms and dining, alongside a strong centralisation of lifestyle retail and event businesses in key urban and commercial cores.
+
+
+# 4 Analysis of Fitness centres and gymnasiums 
+
+```{r}
+# 1. Count number of businesses (93111) in each subzone
+biz_count_93111 <- biz_93111_sf %>%
+  st_join(mpsz_cl, join = st_within) %>%   # assign each business point to subzone
+  st_drop_geometry() %>%
+  group_by(SUBZONE_N) %>%
+  summarise(count = n())                   # count businesses per subzone
+
+# 2. Join count back to subzone polygons
+mpsz_biz93111 <- mpsz_cl %>%
+  left_join(biz_count_93111, by = "SUBZONE_N")
+
+# 3. Plot choropleth map (static)
+tmap_mode("plot")
+
+tm_shape(mpsz_biz93111) + 
+  tm_polygons(fill = "count", 
+              fill.scale = tm_scale_intervals(
+                style = "quantile",  # classify by quantiles
+                n = 5,
+                values = "brewer.blues"), # blue shades
+              fill.legend = tm_legend(
+                title = "No. of Fitness Centres\n& Gymnasiums")) +
+  tm_borders(fill_alpha = 0.5) +
+  tm_compass(type="8star", size = 2) +
+  tm_scalebar() +
+  tm_grid(lwd = 0.1, alpha = 0.2) +
+  tm_layout(main.title = "Distribution of Fitness Centres & Gymnasiums by Subzone")
+```
+
+## 4.1 First-order Spatial Point Patterns Analysis
+
+### 4.1.1 Clark-Evans test with CSR
 
 The test hypotheses are:
 
@@ -451,9 +524,10 @@ clarkevans.test(biz_93111_ppp,
                 method="MonteCarlo",
                 nsim=99)
 ```
+
 Since p<0.05, we reject the null hypothesis (H0), and conclude that the distribution of Fitness centres and gymnasiums is significantly clustered.
 
-## 3.2 Kernel Density Estimation Method
+### 4.1.2 Kernel Density Estimation Method
 
 bw.ppl() algorithm is used as it tends to produce the more appropriate values when the pattern consists predominantly of tight clusters.
 
@@ -496,5 +570,535 @@ tm_shape(kde_93111_bw_terra) +
   tm_compass() +
   tm_layout(main.title = "KDE of Fitness Centres and Gymnasiums",
             scale = 1.0)
+```
+
+The KDE map of fitness centres and gymnasiums shows clear clustering in Singapore. The most intense hotspot is in the central-southern area, reflecting strong concentration in lifestyle and commercial hubs. Smaller clusters appear in the east and north, while western and peripheral zones show low density, indicating limited accessibility.
+
+Overall, fitness centres and gymnasiums are not evenly spread but tend to group in key urban and commercial centres, leaving other subzones relatively underserved. This reflects urban lifestyle demand and spatial inequalities in service distribution.
+
+## 4.2 Second-order Spatial Point Patterns Analysis
+
+```{r}
+set.seed(1234)
+```
+
+### 4.2.1 Computing function estimation
+
+```{r fig.width=10, fig.height=8}
+par(mfrow = c(2, 2))
+
+# G-function
+G_93111 <- Gest(biz_93111_ppp, correction = "border")
+plot(G_93111,
+     main = "G-function")
+
+# F-function
+F_93111 <- Fest(biz_93111_ppp)
+plot(F_93111,
+     main = "F-function")
+
+# K-function
+K_93111 <- Kest(biz_93111_ppp, correction = "Ripley")
+plot(K_93111, . - r ~ r,
+     ylab = "K(d) - r", xlab = "d (m)",
+     main = "K-function")
+
+# L-function
+L_93111 <- Lest(biz_93111_ppp, correction = "Ripley")
+plot(L_93111, . - r ~ r,
+     ylab = "L(d) - r", xlab = "d (m)",
+     main = "L-function")
+```
+
+The G-function measures the distribution of nearest neighbor distances between points. In our results, the observed curve rises above the CSR expectation, indicating that fitness centres tend to have shorter nearest-neighbor distances than expected under randomness. 
+
+The F-function assesses the distance from random locations in space to the nearest point. The observed values lie above the CSR baseline, showing that most areas are close to at least one facility, suggesting fewer empty spaces and stronger clustering. 
+
+The K-function evaluates the expected number of neighbors within a given distance of a typical point. Our curve consistently exceeds the CSR line, confirming clustering across multiple spatial scales. 
+
+The L-function, a stabilized form of K, further simplifies interpretation: observed values remain above zero at nearly all distances, highlighting clustering at both short and larger ranges. 
+
+Overall, the distribution of fitness centres is not random but exhibits strong clustering patterns across spatial scales.
+
+### 4.2.2 Performing Complete Spatial Randomness Test
+
+To confirm the observed spatial patterns above, a hypothesis test will be conducted. The hypothesis and test are as follows:
+
+Ho = The distribution of Fitness centres and gymnasiums are randomly distributed.
+
+H1= The distribution of Fitness centres and gymnasiums are not randomly distributed.
+
+The null hypothesis will be rejected if p-value is smaller than alpha value of 0.001.
+
+```{r fig.width=10, fig.height=8}
+par(mfrow = c(2, 2))
+
+# G-function
+G_93111.csr <- envelope(biz_93111_ppp, Gest, nsim = 999)
+plot(G_93111.csr,
+     main = "G-function",
+     xlab = "r", ylab = "G(r)")
+
+# F-function
+F_93111.csr <- envelope(biz_93111_ppp, Fest, nsim = 999)
+plot(F_93111.csr,
+     main = "F-function",
+     xlab = "r", ylab = "F(r)")
+
+# K-function
+K_93111.csr <- envelope(biz_93111_ppp, Kest,
+                        nsim = 99, rank = 1, glocal = TRUE)
+plot(K_93111.csr, . - r ~ r,
+     main = "K-function",
+     xlab = "d (m)", ylab = "K(d) - r")
+
+# L-function
+L_93111.csr <- envelope(biz_93111_ppp, Lest,
+                        nsim = 99, rank = 1, glocal = TRUE)
+plot(L_93111.csr, . - r ~ r,
+     main = "L-function",
+     xlab = "d (m)", ylab = "L(d) - r")
+```
+
+The spatial point pattern analysis of fitness centres and gymnasiums shows strong evidence of clustering. 
+
+The G-function indicates that centres are located much closer to their nearest neighbors than expected under complete spatial randomness (CSR), confirming micro-level clustering. 
+
+In contrast, the F-function suggests that from many random locations, the nearest facility is farther away than CSR, highlighting the presence of large uncovered areas. 
+
+The K-function further supports clustering, as the observed values are consistently higher than the CSR benchmark across different spatial scales, meaning that fitness centres tend to have more neighboring centres nearby than expected. 
+
+Finally, the L-function, a stabilized version of K, reinforces this pattern with positive deviations across all distances, showing that clustering is not only local but extends to broader areas. 
+
+Overall, fitness centres in Singapore are unevenly distributed: concentrated in lifestyle and commercial hubs, while leaving some subzones relatively underserved.
+
+# 5 Analysis of Retail sale of clothing for adults
+
+## 5.1 First-order Spatial Point Patterns Analysis
+
+### 5.1.1 Clark-Evans test with CSR
+
+The test hypotheses are:
+
+Ho = The distribution of Retail sale of clothing for adults are randomly distributed.
+
+H1= The distribution of Retail sale of clothing for adults are not randomly distributed.
+
+The 95% confident interval will be used.
+
+```{r}
+clarkevans.test(biz_47711_ppp,
+                correction="none",
+                clipregion="sg_owin",
+                alternative=c("clustered"),
+                method="MonteCarlo",
+                nsim=99)
+```
+Since p<0.05, we reject the null hypothesis (H0), and conclude that the distribution of Retail sale of clothing for adults is significantly clustered.
+
+### 5.1.2 Kernel Density Estimation Method
+
+bw.ppl() algorithm is used as it tends to produce the more appropriate values when the pattern consists predominantly of tight clusters.
+
+```{r}
+# convert into km
+biz_47711_ppp_km <- rescale.ppp(
+  biz_47711_ppp, 1000, "km")
+
+kde_biz_47711_km <- density(biz_47711_ppp_km,
+                              sigma=bw.ppl,
+                              edge=TRUE,
+                              kernel="gaussian")
+
+# Convert into raster
+kde_47711_bw_terra <- rast(kde_biz_47711_km)
+
+# Assign projection systems
+crs(kde_47711_bw_terra) <- "EPSG:3414"
+
+kde_47711_bw_terra
+```
+
+```{r}
+tmap_mode('plot')
+
+tm_shape(kde_47711_bw_terra) + 
+  tm_raster(col.scale = 
+              tm_scale_continuous(
+                values = "viridis"),
+            col.legend = tm_legend(
+            title = "Density values",
+            title.size = 0.7,
+            text.size = 0.7,
+            bg.color = "white",
+            bg.alpha = 0.7,
+            position = tm_pos_in(
+              "right", "bottom"),
+            frame = TRUE)) +
+  tm_graticules(labels.size = 0.7) +
+  tm_compass() +
+  tm_layout(main.title = "KDE of Retail sale of clothing for adults",
+            scale = 1.0)
+```
+
+The KDE map of retail sale of clothing for adults shows strong clustering across Singapore. The most intense hotspot is concentrated in the central-southern area, reflecting the dominance of major shopping districts and malls in the city core. Additional moderate clusters can be observed in the eastern and northern regions, where regional centres also attract retail activity. By contrast, the western and peripheral areas display much lower density, suggesting limited presence of clothing retail outlets outside major commercial hubs.
+
+Overall, retail clothing stores are unevenly distributed, with higher concentrations in urban centres and key shopping corridors. This pattern highlights consumer demand for accessible retail in central and regional hubs, while also revealing gaps in suburban and peripheral areas where such services remain less available.
+
+## 5.2 Second-order Spatial Point Patterns Analysis
+
+### 5.2.1 Function estimation
+
+```{r fig.width=10, fig.height=8}
+par(mfrow = c(2, 2))
+
+# G-function
+G_47711 <- Gest(biz_47711_ppp, correction = "border")
+plot(G_47711,
+     main = "G-function")
+
+# F-function
+F_47711 <- Fest(biz_47711_ppp)
+plot(F_47711,
+     main = "F-function")
+
+# K-function
+K_47711 <- Kest(biz_47711_ppp, correction = "Ripley")
+plot(K_47711, . - r ~ r,
+     ylab = "K(d) - r", xlab = "d (m)",
+     main = "K-function")
+
+# L-function
+L_47711 <- Lest(biz_47711_ppp, correction = "Ripley")
+plot(L_47711, . - r ~ r,
+     ylab = "L(d) - r", xlab = "d (m)",
+     main = "L-function")
+```
+
+### 5.2.2 Complete Spatial Randomness Test
+
+To confirm the observed spatial patterns above, a hypothesis test will be conducted. The hypothesis and test are as follows:
+
+Ho = The distribution of Retail sale of clothing for adults are randomly distributed.
+
+H1= The distribution of Retail sale of clothing for adults are not randomly distributed.
+
+The null hypothesis will be rejected if p-value is smaller than alpha value of 0.001.
+
+```{r fig.width=10, fig.height=8}
+par(mfrow = c(2, 2))
+
+# G-function
+G_47711.csr <- envelope(biz_47711_ppp, Gest, nsim = 999)
+plot(G_47711.csr,
+     main = "G-function",
+     xlab = "r", ylab = "G(r)")
+
+# F-function
+F_47711.csr <- envelope(biz_47711_ppp, Fest, nsim = 999)
+plot(F_47711.csr,
+     main = "F-function",
+     xlab = "r", ylab = "F(r)")
+
+# K-function
+K_47711.csr <- envelope(biz_47711_ppp, Kest,
+                        nsim = 99, rank = 1, glocal = TRUE)
+plot(K_47711.csr, . - r ~ r,
+     main = "K-function",
+     xlab = "d (m)", ylab = "K(d) - r")
+
+# L-function
+L_47711.csr <- envelope(biz_47711_ppp, Lest,
+                        nsim = 99, rank = 1, glocal = TRUE)
+plot(L_47711.csr, . - r ~ r,
+     main = "L-function",
+     xlab = "d (m)", ylab = "L(d) - r")
+```
+
+# 6 Analysis of Restaurants and Cafés
+
+## 6.1 First-order Spatial Point Patterns Analysis
+
+### 6.1.1 Clark-Evans test with CSR
+
+The test hypotheses are:
+
+Ho = The distribution of Restaurants and Cafés are randomly distributed.
+
+H1= The distribution of Restaurants and Cafés are not randomly distributed.
+
+The 95% confident interval will be used.
+
+```{r}
+clarkevans.test(biz_56111_ppp,
+                correction="none",
+                clipregion="sg_owin",
+                alternative=c("clustered"),
+                method="MonteCarlo",
+                nsim=99)
+```
+Since p<0.05, we reject the null hypothesis (H0), and conclude that the distribution of Restaurants and Cafés is significantly clustered.
+
+### 6.1.2 Kernel Density Estimation Method
+
+bw.ppl() algorithm is used as it tends to produce the more appropriate values when the pattern consists predominantly of tight clusters.
+
+```{r}
+# convert into km
+biz_56111_ppp_km <- rescale.ppp(
+  biz_56111_ppp, 1000, "km")
+
+kde_biz_56111_km <- density(biz_56111_ppp_km,
+                              sigma=bw.ppl,
+                              edge=TRUE,
+                              kernel="gaussian")
+
+# Convert into raster
+kde_56111_bw_terra <- rast(kde_biz_56111_km)
+
+# Assign projection systems
+crs(kde_56111_bw_terra) <- "EPSG:3414"
+
+kde_56111_bw_terra
+```
+
+```{r}
+tmap_mode('plot')
+
+tm_shape(kde_56111_bw_terra) + 
+  tm_raster(col.scale = 
+              tm_scale_continuous(
+                values = "viridis"),
+            col.legend = tm_legend(
+            title = "Density values",
+            title.size = 0.7,
+            text.size = 0.7,
+            bg.color = "white",
+            bg.alpha = 0.7,
+            position = tm_pos_in(
+              "right", "bottom"),
+            frame = TRUE)) +
+  tm_graticules(labels.size = 0.7) +
+  tm_compass() +
+  tm_layout(main.title = "KDE of Restaurants and Cafés",
+            scale = 1.0)
+```
+
+The KDE map of restaurants and cafés shows strong clustering in Singapore. The most intense hotspot is found in the central-southern region, highlighting high concentrations around lifestyle, entertainment, and business hubs. Additional clusters are visible in the eastern region and parts of the north, reflecting dining activity in regional centres and densely populated areas. In contrast, the western and peripheral areas show lower density, indicating fewer establishments and more limited accessibility in those zones.
+
+Overall, restaurants and cafés are unevenly distributed, with clear concentration in city and regional centres where demand is highest. This reflects urban lifestyle patterns, where food and beverage outlets thrive in commercial cores, transport nodes, and densely populated neighbourhoods. At the same time, the low densities in outlying areas suggest opportunities for further development to enhance dining accessibility in suburban and peripheral zones.
+
+## 6.2 Second-order Spatial Point Patterns Analysis
+
+### 6.2.1 Function estimation
+
+```{r fig.width=10, fig.height=8}
+par(mfrow = c(2, 2))
+
+# G-function
+G_56111 <- Gest(biz_56111_ppp, correction = "border")
+plot(G_56111,
+     main = "G-function")
+
+# F-function
+F_56111 <- Fest(biz_56111_ppp)
+plot(F_56111,
+     main = "F-function")
+
+# K-function
+K_56111 <- Kest(biz_56111_ppp, correction = "Ripley")
+plot(K_56111, . - r ~ r,
+     ylab = "K(d) - r", xlab = "d (m)",
+     main = "K-function")
+
+# L-function
+L_56111 <- Lest(biz_56111_ppp, correction = "Ripley")
+plot(L_56111, . - r ~ r,
+     ylab = "L(d) - r", xlab = "d (m)",
+     main = "L-function")
+```
+
+### 6.2.2 Complete Spatial Randomness Test
+
+To confirm the observed spatial patterns above, a hypothesis test will be conducted. The hypothesis and test are as follows:
+
+Ho = The distribution of Restaurants and Cafés are randomly distributed.
+
+H1= The distribution of Restaurants and Cafés are not randomly distributed.
+
+The null hypothesis will be rejected if p-value is smaller than alpha value of 0.001.
+
+```{r fig.width=10, fig.height=8}
+par(mfrow = c(2, 2))
+
+# G-function
+G_56111.csr <- envelope(biz_56111_ppp, Gest, nsim = 999)
+plot(G_56111.csr,
+     main = "G-function",
+     xlab = "r", ylab = "G(r)")
+
+# F-function
+F_56111.csr <- envelope(biz_56111_ppp, Fest, nsim = 999)
+plot(F_56111.csr,
+     main = "F-function",
+     xlab = "r", ylab = "F(r)")
+
+# K-function
+K_56111.csr <- envelope(biz_56111_ppp, Kest,
+                        nsim = 99, rank = 1, glocal = TRUE)
+plot(K_56111.csr, . - r ~ r,
+     main = "K-function",
+     xlab = "d (m)", ylab = "K(d) - r")
+
+# L-function
+L_56111.csr <- envelope(biz_56111_ppp, Lest,
+                        nsim = 99, rank = 1, glocal = TRUE)
+plot(L_56111.csr, . - r ~ r,
+     main = "L-function",
+     xlab = "d (m)", ylab = "L(d) - r")
+```
+
+# 7 Analysis of Event/Concert Organisers
+
+## 7.1 First-order Spatial Point Patterns Analysis
+
+### 7.1.1 Clark-Evans test with CSR
+
+The test hypotheses are:
+
+Ho = The distribution of Event/Concert Organisers are randomly distributed.
+
+H1= The distribution of Event/Concert Organisers are not randomly distributed.
+
+The 95% confident interval will be used.
+
+```{r}
+clarkevans.test(biz_82303_ppp,
+                correction="none",
+                clipregion="sg_owin",
+                alternative=c("clustered"),
+                method="MonteCarlo",
+                nsim=99)
+```
+
+Since p<0.05, we reject the null hypothesis (H0), and conclude that the distribution of Event/Concert Organisers is significantly clustered.
+
+### 7.1.2 Kernel Density Estimation Method
+
+bw.ppl() algorithm is used as it tends to produce the more appropriate values when the pattern consists predominantly of tight clusters.
+
+```{r}
+# convert into km
+biz_82303_ppp_km <- rescale.ppp(
+  biz_82303_ppp, 1000, "km")
+
+kde_biz_82303_km <- density(biz_82303_ppp_km,
+                              sigma=bw.ppl,
+                              edge=TRUE,
+                              kernel="gaussian")
+
+# Convert into raster
+kde_82303_bw_terra <- rast(kde_biz_82303_km)
+
+# Assign projection systems
+crs(kde_82303_bw_terra) <- "EPSG:3414"
+
+kde_82303_bw_terra
+```
+
+```{r}
+tmap_mode('plot')
+
+tm_shape(kde_82303_bw_terra) + 
+  tm_raster(col.scale = 
+              tm_scale_continuous(
+                values = "viridis"),
+            col.legend = tm_legend(
+            title = "Density values",
+            title.size = 0.7,
+            text.size = 0.7,
+            bg.color = "white",
+            bg.alpha = 0.7,
+            position = tm_pos_in(
+              "right", "bottom"),
+            frame = TRUE)) +
+  tm_graticules(labels.size = 0.7) +
+  tm_compass() +
+  tm_layout(main.title = "KDE of Event/Concert Organisers",
+            scale = 1.0)
+```
+
+The KDE map of event and concert organisers shows a clustered but more dispersed pattern across Singapore. The most intense hotspot is located in the central-southern region, reflecting the presence of major entertainment venues, convention centres, and business districts. Additional moderate clusters can be observed in the eastern and northern areas, suggesting smaller hubs of activity where regional facilities or community venues support event services. In contrast, the western areas show relatively low density, indicating fewer organisers and limited coverage in those zones.
+
+Overall, event and concert organisers are unevenly distributed, with clear concentration in city centres where large-scale events and performances are most viable. The presence of smaller clusters across other regions indicates secondary hubs of activity, but many suburban and peripheral areas remain underrepresented. This reflects the dependence of the events industry on centralised venues and transport accessibility, while also highlighting opportunities for decentralised growth.
+
+## 7.2 Second-order Spatial Point Patterns Analysis
+
+### 7.2.1 Function estimation
+
+```{r fig.width=10, fig.height=8}
+par(mfrow = c(2, 2))
+
+# G-function
+G_82303 <- Gest(biz_82303_ppp, correction = "border")
+plot(G_82303,
+     main = "G-function")
+
+# F-function
+F_82303 <- Fest(biz_82303_ppp)
+plot(F_82303,
+     main = "F-function")
+
+# K-function
+K_82303 <- Kest(biz_82303_ppp, correction = "Ripley")
+plot(K_82303, . - r ~ r,
+     ylab = "K(d) - r", xlab = "d (m)",
+     main = "K-function")
+
+# L-function
+L_82303 <- Lest(biz_82303_ppp, correction = "Ripley")
+plot(L_82303, . - r ~ r,
+     ylab = "L(d) - r", xlab = "d (m)",
+     main = "L-function")
+```
+
+### 7.2.2 Complete Spatial Randomness Test
+
+To confirm the observed spatial patterns above, a hypothesis test will be conducted. The hypothesis and test are as follows:
+
+Ho = The distribution of Event/Concert Organisers are randomly distributed.
+
+H1= The distribution of Event/Concert Organisers are not randomly distributed.
+
+The null hypothesis will be rejected if p-value is smaller than alpha value of 0.001.
+
+```{r fig.width=10, fig.height=8}
+par(mfrow = c(2, 2))
+
+# G-function
+G_82303.csr <- envelope(biz_82303_ppp, Gest, nsim = 999)
+plot(G_82303.csr,
+     main = "G-function",
+     xlab = "r", ylab = "G(r)")
+
+# F-function
+F_82303.csr <- envelope(biz_82303_ppp, Fest, nsim = 999)
+plot(F_82303.csr,
+     main = "F-function",
+     xlab = "r", ylab = "F(r)")
+
+# K-function
+K_82303.csr <- envelope(biz_82303_ppp, Kest,
+                        nsim = 99, rank = 1, glocal = TRUE)
+plot(K_82303.csr, . - r ~ r,
+     main = "K-function",
+     xlab = "d (m)", ylab = "K(d) - r")
+
+# L-function
+L_82303.csr <- envelope(biz_82303_ppp, Lest,
+                        nsim = 99, rank = 1, glocal = TRUE)
+plot(L_82303.csr, . - r ~ r,
+     main = "L-function",
+     xlab = "d (m)", ylab = "L(d) - r")
 ```
 
