@@ -775,6 +775,18 @@ plot(L_47711, . - r ~ r,
      main = "L-function")
 ```
 
+The output of retail sale of clothing for adults indicates a clear clustering pattern. 
+
+The G-function shows that the observed nearest-neighbor distances are much shorter than expected under complete spatial randomness (CSR), meaning outlets tend to locate close together. 
+
+The F-function lies below the CSR curve, suggesting that from random locations, clothing stores are generally farther away than under randomness, highlighting gaps between concentrated retail hubs. 
+
+The K-function further confirms clustering, as the observed values exceed the CSR benchmark across most distances, indicating more neighbors within a given radius than expected. 
+
+Similarly, the L-function shows strong positive deviations from CSR, reinforcing the presence of clustering across both short and larger distances.
+
+Overall, the results suggest retail clothing stores in Singapore are not evenly spread but are concentrated in commercial hubs and shopping districts, reflecting consumer demand patterns and the attractiveness of established retail agglomerations.
+
 ### 5.2.2 Complete Spatial Randomness Test
 
 To confirm the observed spatial patterns above, a hypothesis test will be conducted. The hypothesis and test are as follows:
