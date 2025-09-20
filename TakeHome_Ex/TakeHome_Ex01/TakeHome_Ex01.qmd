@@ -10,7 +10,27 @@ execute:
   freeze: true
 ---
 
+This project analyzes the spatial and temporal distribution of four key business types in Singapore—Fitness Centres & Gymnasiums, Retail Clothing Stores, Restaurants & Cafés, and Event/Concert Organisers—between January 2024 and June 2025. Using registration data, choropleth maps, kernel density estimation, and spatial point pattern analyses (G, F, K, L functions with CSR tests), the study identifies hotspots, clustering patterns, and underserved areas. Findings reveal strong centralisation of lifestyle and retail activities in the Central Region, moderate clustering in East and North Regions, and limited presence in peripheral zones. These insights provide an evidence base to support urban land use planning, zoning, and policy decisions aligned with Singaporeans’ lifestyle needs and equitable service distribution.
+
 # 1 Loading the R packages
+
+In this exercise, we will use following packages:
+
+tidyverse – A collection of data science packages (readr, dplyr, tidyr, ggplot2, etc.) with a unified grammar for importing, wrangling, and visualising data.
+
+sf – Simple Features for R: create, read, write, transform, and analyse vector geospatial data (points/lines/polygons) with modern CRS support.
+
+tmap – Thematic mapping for R: produce high-quality static maps and interactive web maps (via leaflet) with flexible cartographic styling.
+
+httr – Tools for working with HTTP: make GET/POST requests, handle authentication, and parse web API responses.
+
+patchwork – Combine multiple ggplot2 plots into neat layouts (grids, annotations, shared titles) with simple operators.
+
+terra – Modern spatial raster/vector handling: read/write, project, crop, mask, compute terrain analyses, and rasterize/vectorize operations.
+
+spatstat – Comprehensive spatial point pattern analysis: create ppp objects, estimate G/F/K/L functions, fit point process models, KDE, simulation, and hypothesis tests.
+
+rvest – Web scraping made easy: download HTML pages and extract elements, text, and tables with css/xpath selectors.
 
 ```{r}
 pacman::p_load(tidyverse, sf, tmap, httr, 
@@ -18,9 +38,12 @@ pacman::p_load(tidyverse, sf, tmap, httr,
                terra, spatstat, rvest)
 ```
 
+
 # 2 Data Importing and Wrangling
 
 ## 2.1 Importing and saving ACRA data
+
+The code below collects all ACRA CSV files from the specified folder, reads and combines them into a single dataset, and saves the result as an RDS file for later use.
 
 ```{r}
 folder_path <- "data/aspatial/acra"
@@ -37,15 +60,17 @@ write_rds(acra_data,
 
 ## 2.2 Tidying ACRA data
 
-4 types of business that related to Singaporean's lifestyle are selected:
+Four types of business that related to Singaporean's lifestyle are selected:
 
-SSIC 93111 – Fitness centres and gymnasiums 
+SSIC 93111 – Fitness centres and gymnasiums
 
 SSIC 47711 – Retail sale of clothing for adults
 
 SSIC 56111 – Restaurants and Cafés
 
 SSIC 82303 – Event/Concert Organisers
+
+The code below extracts the selected business types from the ACRA dataset. For each category, it selects relevant variables, standardises the incorporation date into usable formats (year, month, abbreviation), pads postal codes to six digits for consistency, and filters businesses registered between January 1, 2024, and June 30, 2025. The result is four cleaned datasets, each tailored for subsequent spatial and temporal analysis.
 
 ```{r}
 #Fitness centres and gymnasiums 
@@ -115,11 +140,14 @@ biz_82303 <- acra_data %>%
 
 ## 2.3 Geocoding
 
-found: successfully geocoded not found: unsuccessfully geocoded
+The code below performs geocoding for each business type using the SLA OneMap API. It first extracts unique postal codes from the dataset and queries the API to retrieve corresponding geographic coordinates and address details. 
+
+The results are separated into two groups: found (postal codes successfully matched) and not_found (unmatched codes). The matched geocode results are tidied and joined back into the business dataset, enriching each record with spatial information. 
+
+Finally, the updated dataset is saved as an .rds file, and an sf (Simple Features) object is created with EPSG:3414 projection, enabling spatial analysis and mapping of the businesses.
 
 ::: panel-tabset
-
-### Fitness centres and gymnasiums 
+### Fitness centres and gymnasiums
 
 ```{r}
 #Geocoding
@@ -314,10 +342,11 @@ biz_82303_sf <- st_as_sf(biz_82303,
                          coords = c("X", "Y"),
                          crs = 3414)
 ```
-
 :::
 
 ## 2.4 Creating owin object
+
+The code below processes Singapore’s Master Plan 2019 subzone boundaries for spatial analysis. It reads the KML file, extracts key attributes (region, planning area, subzone), removes irrelevant areas (Southern Group and offshore islands), and saves the cleaned dataset. Finally, it converts the boundaries into an owin object to define the study area for spatial point pattern analysis.
 
 ```{r}
 mpsz_sf <- st_read("data/geospatial/MasterPlan2019SubzoneBoundaryNoSeaKML.kml") %>% 
@@ -360,6 +389,8 @@ sg_owin <- as.owin(mpsz_cl)
 
 ## 2.5 Combining point events object and owin object
 
+The code below prepares business location data for spatial point pattern analysis. It converts the geocoded business datasets (in sf format) into ppp objects required by the spatstat package. The rjitter() function slightly adjusts overlapping points to avoid duplication errors. Finally, each business type dataset is clipped to the Singapore study area (sg_owin) so that analyses are restricted within valid subzone boundaries.
+
 ```{r}
 # Converting sf data frames to ppp class
 biz_93111_ppp <- as.ppp(biz_93111_sf) %>%
@@ -388,6 +419,7 @@ biz_47711_ppp = biz_47711_ppp[sg_owin]
 biz_56111_ppp = biz_56111_ppp[sg_owin]
 biz_82303_ppp = biz_82303_ppp[sg_owin]
 ```
+
 
 # 3 Business Overview
 
@@ -430,13 +462,13 @@ p4 <- plot_monthly(biz_82303, "Distribution of Event/Concert Organisers", "#fdbf
 
 The registration trends of the four business types between January 2024 and June 2025 reveal distinct patterns.
 
-Fitness Centres and Gymnasiums show relatively low and fluctuating registrations, with occasional peaks, suggesting niche but growing demand. 
+Fitness Centres and Gymnasiums show relatively low and fluctuating registrations, with occasional peaks, suggesting niche but growing demand.
 
-Retail Clothing Stores maintain a steady level of registrations across the period, reflecting stable consumer demand for fashion and apparel. 
+Retail Clothing Stores maintain a steady level of registrations across the period, reflecting stable consumer demand for fashion and apparel.
 
-Restaurants and Cafés record the highest number of registrations, with clear peaks in early and mid-2024, indicating strong entrepreneurial activity and consistent demand in the food and beverage sector. 
+Restaurants and Cafés record the highest number of registrations, with clear peaks in early and mid-2024, indicating strong entrepreneurial activity and consistent demand in the food and beverage sector.
 
-Event and Concert Organisers display moderate but slightly declining registrations over time, possibly influenced by market saturation or economic constraints on entertainment services. 
+Event and Concert Organisers display moderate but slightly declining registrations over time, possibly influenced by market saturation or economic constraints on entertainment services.
 
 Overall, the distribution highlights food services as the most vibrant and rapidly expanding sector, while retail clothing remains steady, fitness shows sporadic growth, and events demonstrate more cautious or stabilising entry into the market.
 
@@ -459,28 +491,32 @@ tm_layout(legend.outside = TRUE,
 tm_view(set_zoom_limits = c(12,16))
 ```
 
-The spatial distribution of the four business types reveals clear urban concentration patterns in Singapore. 
+The spatial distribution of the four business types reveals clear urban concentration patterns in Singapore.
 
-Fitness Centres and Gymnasiums (blue dots) are fairly dispersed but cluster in residential towns, reflecting demand for convenient access to health and fitness services. 
+Fitness Centres and Gymnasiums (blue dots) are fairly dispersed but cluster in residential towns, reflecting demand for convenient access to health and fitness services.
 
-Retail Clothing Stores (red dots) are more heavily concentrated in central areas, particularly the downtown core and major commercial hubs, where shopping malls dominate. 
+Retail Clothing Stores (red dots) are more heavily concentrated in central areas, particularly the downtown core and major commercial hubs, where shopping malls dominate.
 
-Restaurants and Cafés (green dots) appear densely concentrated in the central and eastern regions, aligning with lifestyle clusters and dining districts, while still maintaining a widespread presence across neighborhoods. 
+Restaurants and Cafés (green dots) appear densely concentrated in the central and eastern regions, aligning with lifestyle clusters and dining districts, while still maintaining a widespread presence across neighborhoods.
 
-Event and Concert Organisers (orange dots) are concentrated in the city centre and selected regional nodes, close to major venues and transport links. 
+Event and Concert Organisers (orange dots) are concentrated in the city centre and selected regional nodes, close to major venues and transport links.
 
 Overall, the distribution highlights Singapore’s mixed pattern of decentralised services for daily needs, such as gyms and dining, alongside a strong centralisation of lifestyle retail and event businesses in key urban and commercial cores.
 
 
-# 4 Analysis of Fitness centres and gymnasiums 
+# 4 Analysis of Fitness centres and gymnasiums
+
+::: panel-tabset
+
+## Choropleth Map
 
 ```{r}
 # Count number of businesses in each subzone
 biz_count_93111 <- biz_93111_sf %>%
-  st_join(mpsz_cl, join = st_within) %>%   # assign each business point to subzone
+  st_join(mpsz_cl, join = st_within) %>%   
   st_drop_geometry() %>%
   group_by(SUBZONE_N) %>%
-  summarise(count = n())                   # count businesses per subzone
+  summarise(count = n())                   
 
 # Join count back to subzone polygons
 mpsz_biz93111 <- mpsz_cl %>%
@@ -512,11 +548,26 @@ tm_shape(mpsz_biz93111) +
   tm_layout(main.title = "Distribution of Fitness Centres & Gymnasiums by Subzone")
 ```
 
-The choropleth map shows the distribution of fitness centres and gymnasiums across Singapore subzones. Most subzones have only a few establishments, typically between 1 and 4, as reflected by the lighter shades of blue. 
+## Outlier List
 
-However, a few subzones highlighted with thick black borders stand out as outliers, recording significantly higher counts of up to 22. These outlier subzones are mainly concentrated in central and eastern Singapore, areas that coincide with high-density residential, commercial, and lifestyle hubs. The clustering of fitness centres in these zones reflects strong demand driven by population density, higher disposable incomes, and vibrant urban activity. Conversely, peripheral and industrial subzones show sparse or no fitness centres, suggesting limited accessibility for residents in those areas. 
+```{r}
+# Extract outlier zones with counts and their regions, sort in descending order
+outlier_zones_sorted <- outlier_sf %>%
+  st_drop_geometry() %>%
+  arrange(desc(count)) %>%
+  select(SUBZONE_N, REGION_N, count)
 
-Overall, the map highlights spatial inequality in the availability of fitness facilities, with clear hotspots in key urban subzones while many regions remain underserved, indicating potential gaps in accessibility and business opportunities.
+# List
+print(outlier_zones_sorted)
+```
+
+:::
+
+The choropleth map shows the distribution of fitness centres and gymnasiums across Singapore subzones. Most subzones host only 1–4 establishments, represented in lighter blue, indicating limited accessibility in many areas.
+
+However, several subzones outlined in black stand out as outliers, with counts well above the overall pattern. Notably, Cecil (22), Geylang East (14), Chinatown (13), Katong (12), and Sentosa (11) record the highest concentrations. These subzones, mainly within the Central Region, are closely linked to commercial districts, lifestyle hubs, and tourist destinations, where demand for fitness services is strongest. 
+
+The map highlights spatial inequality, with fitness centres clustering in central and eastern urban subzones while peripheral areas remain underserved. This suggests opportunities for expanding services to improve accessibility in less well-covered regions.
 
 ## 4.1 First-order Spatial Point Patterns Analysis
 
@@ -590,57 +641,72 @@ The KDE map of fitness centres and gymnasiums shows clear clustering in Singapor
 
 Overall, fitness centres and gymnasiums are not evenly spread but tend to group in key urban and commercial centres, leaving other subzones relatively underserved. This reflects urban lifestyle demand and spatial inequalities in service distribution.
 
-## 4.2 Second-order Spatial Point Patterns Analysis
+## 4.2 Regional analysis - Central Region
 
 ```{r}
-set.seed(1234)
+cr <- mpsz_cl %>%
+  filter(REGION_N == "CENTRAL REGION")
+
+cr_owin = as.owin(cr)
+
+biz93111_cr_ppp = biz_93111_ppp[cr_owin]
+biz93111_cr_ppp.km = rescale.ppp(biz93111_cr_ppp, 1000, "km")
+
+plot(unmark(biz93111_cr_ppp.km), 
+  main="Fitness centres and gymnasiums in Central Region")
 ```
 
-### 4.2.1 Computing function estimation
+The map shows the spatial distribution of fitness centres and gymnasiums in the Central Region of Singapore, with notable clustering in the downtown and surrounding urban areas.
+
+### 4.2.1 Central Region Second-order Spatial Point Patterns Analysis
+
+#### Function estimation 
 
 ```{r fig.width=10, fig.height=8}
+set.seed(1234)
+
 par(mfrow = c(2, 2))
 
 # G-function
-G_93111 <- Gest(biz_93111_ppp, correction = "border")
-plot(G_93111,
-     main = "G-function")
+G_93111_cr <- Gest(biz93111_cr_ppp, correction = "border")
+plot(G_93111_cr,
+     main = "G-function (Fitness centres in Central Region)")
 
 # F-function
-F_93111 <- Fest(biz_93111_ppp)
-plot(F_93111,
-     main = "F-function")
+F_93111_cr <- Fest(biz93111_cr_ppp)
+plot(F_93111_cr,
+     main = "F-function (Fitness centres in Central Region)")
 
 # K-function
-K_93111 <- Kest(biz_93111_ppp, correction = "Ripley")
-plot(K_93111, . - r ~ r,
+K_93111_cr <- Kest(biz93111_cr_ppp, correction = "Ripley")
+plot(K_93111_cr, . - r ~ r,
      ylab = "K(d) - r", xlab = "d (m)",
-     main = "K-function")
+     main = "K-function (Fitness centres in Central Region)")
 
 # L-function
-L_93111 <- Lest(biz_93111_ppp, correction = "Ripley")
-plot(L_93111, . - r ~ r,
+L_93111_cr <- Lest(biz93111_cr_ppp, correction = "Ripley")
+plot(L_93111_cr, . - r ~ r,
      ylab = "L(d) - r", xlab = "d (m)",
-     main = "L-function")
+     main = "L-function (Fitness centres in Central Region)")
 ```
 
-The G-function measures the distribution of nearest neighbor distances between points. In our results, the observed curve rises above the CSR expectation, indicating that fitness centres tend to have shorter nearest-neighbor distances than expected under randomness. 
+The G-function shows the distribution of nearest-neighbour distances. The observed curve rises steeply above the Poisson expectation, indicating strong clustering, as many fitness centres are located very close to one another.
 
-The F-function assesses the distance from random locations in space to the nearest point. The observed values lie above the CSR baseline, showing that most areas are close to at least one facility, suggesting fewer empty spaces and stronger clustering. 
+The F-function, which measures empty-space distances, shows the observed distribution closer to the theoretical Poisson line but still indicating clustering. This means random points within the region are, on average, closer to a fitness centre than expected under randomness.
 
-The K-function evaluates the expected number of neighbors within a given distance of a typical point. Our curve consistently exceeds the CSR line, confirming clustering across multiple spatial scales. 
+The K-function rises well above the theoretical Poisson curve, confirming significant clustering at multiple spatial scales. The steep increase suggests that fitness centres are highly concentrated in hotspots rather than evenly spread across the region.
 
-The L-function, a stabilized form of K, further simplifies interpretation: observed values remain above zero at nearly all distances, highlighting clustering at both short and larger ranges. 
+The L-function further reinforces this, showing values much higher than the theoretical line before tapering off, highlighting strong clustering up to ~2000m before stabilising.
 
-Overall, the distribution of fitness centres is not random but exhibits strong clustering patterns across spatial scales.
+Overall, the Central Region exhibits strong spatial clustering of fitness centres, reflecting demand around dense urban hubs.
 
-### 4.2.2 Performing Complete Spatial Randomness Test
+#### Complete Spatial Randomness Test
 
 To confirm the observed spatial patterns above, a hypothesis test will be conducted. The hypothesis and test are as follows:
 
-Ho = The distribution of Fitness centres and gymnasiums are randomly distributed.
+Ho = The distribution of Fitness centres and gymnasiums in Central Region are randomly distributed.
 
-H1= The distribution of Fitness centres and gymnasiums are not randomly distributed.
+H1= The distribution of Fitness centres and gymnasiums in Central Region are not randomly distributed.
 
 The null hypothesis will be rejected if p-value is smaller than alpha value of 0.001.
 
@@ -648,54 +714,56 @@ The null hypothesis will be rejected if p-value is smaller than alpha value of 0
 par(mfrow = c(2, 2))
 
 # G-function
-G_93111.csr <- envelope(biz_93111_ppp, Gest, nsim = 999)
-plot(G_93111.csr,
-     main = "G-function",
+G_93111_cr.csr <- envelope(biz93111_cr_ppp, Gest, nsim = 999)
+plot(G_93111_cr.csr,
+     main = "G-function (Fitness centres in Central Region)",
      xlab = "r", ylab = "G(r)")
 
 # F-function
-F_93111.csr <- envelope(biz_93111_ppp, Fest, nsim = 999)
-plot(F_93111.csr,
-     main = "F-function",
+F_93111_cr.csr <- envelope(biz93111_cr_ppp, Fest, nsim = 999)
+plot(F_93111_cr.csr,
+     main = "F-function (Fitness centres in Central Region)",
      xlab = "r", ylab = "F(r)")
 
 # K-function
-K_93111.csr <- envelope(biz_93111_ppp, Kest,
+K_93111_cr.csr <- envelope(biz93111_cr_ppp, Kest,
                         nsim = 99, rank = 1, glocal = TRUE)
-plot(K_93111.csr, . - r ~ r,
-     main = "K-function",
+plot(K_93111_cr.csr, . - r ~ r,
+     main = "K-function (Fitness centres in Central Region)",
      xlab = "d (m)", ylab = "K(d) - r")
 
 # L-function
-L_93111.csr <- envelope(biz_93111_ppp, Lest,
+L_93111_cr.csr <- envelope(biz93111_cr_ppp, Lest,
                         nsim = 99, rank = 1, glocal = TRUE)
-plot(L_93111.csr, . - r ~ r,
-     main = "L-function",
+plot(L_93111_cr.csr, . - r ~ r,
+     main = "L-function (Fitness centres in Central Region)",
      xlab = "d (m)", ylab = "L(d) - r")
 ```
 
-The spatial point pattern analysis of fitness centres and gymnasiums shows strong evidence of clustering. 
+The G-function (nearest-neighbour distance) shows the observed curve far above the theoretical Poisson line, with values outside the simulation envelope. This indicates significant clustering of gyms at short distances, rejecting randomness.
 
-The G-function indicates that centres are located much closer to their nearest neighbors than expected under complete spatial randomness (CSR), confirming micro-level clustering. 
+The F-function (empty space) shows the observed curve below the Poisson expectation and outside the envelope at several distances. This means random points in the region are generally farther from gyms than expected, reflecting clustering and gaps in coverage.
 
-In contrast, the F-function suggests that from many random locations, the nearest facility is farther away than CSR, highlighting the presence of large uncovered areas. 
+The K-function lies consistently above the theoretical line and outside the envelope, confirming clustering across larger spatial scales, not just at the nearest-neighbour level.
 
-The K-function further supports clustering, as the observed values are consistently higher than the CSR benchmark across different spatial scales, meaning that fitness centres tend to have more neighboring centres nearby than expected. 
+The L-function also rises well above the expected line, showing strong clustering up to ~2000m before tapering.
 
-Finally, the L-function, a stabilized version of K, reinforces this pattern with positive deviations across all distances, showing that clustering is not only local but extends to broader areas. 
-
-Overall, fitness centres in Singapore are unevenly distributed: concentrated in lifestyle and commercial hubs, while leaving some subzones relatively underserved.
+Since observed functions consistently deviate from the theoretical Poisson distribution and cross outside the simulation envelopes, the null hypothesis (Ho) is rejected. Thus, Fitness Centres and Gymnasiums in the Central Region are not randomly distributed but exhibit significant spatial clustering.
 
 
 # 5 Analysis of Retail sale of clothing for adults
 
+::: panel-tabset
+
+## Choropleth Map
+
 ```{r}
 # Count number of businesses in each subzone
 biz_count_47711 <- biz_47711_sf %>%
-  st_join(mpsz_cl, join = st_within) %>%   # assign each business point to subzone
+  st_join(mpsz_cl, join = st_within) %>%   
   st_drop_geometry() %>%
   group_by(SUBZONE_N) %>%
-  summarise(count = n())                   # count businesses per subzone
+  summarise(count = n())     
 
 # Join count back to subzone polygons
 mpsz_biz47711 <- mpsz_cl %>%
@@ -727,11 +795,28 @@ tm_shape(mpsz_biz47711) +
   tm_layout(main.title = "Distribution of Retail sale of clothing for adults")
 ```
 
-The map illustrates the distribution of retail businesses selling clothing for adults across Singapore subzones. Most areas record modest counts between 1 and 5 outlets, indicated by lighter shades of red. 
+## Outlier List
 
-However, subzones highlighted with thick black borders stand out as outliers, with counts as high as 51. These outlier subzones are concentrated in central, eastern, and some northern regions, which align with major commercial hubs, town centres, and high-density residential zones. The clustering pattern reflects strong consumer demand and the tendency for clothing retailers to establish in areas with heavy foot traffic, such as malls, shopping belts, and transportation nodes. In contrast, peripheral or industrial subzones display minimal activity, highlighting unequal accessibility to fashion retail. 
+```{r}
+# Extract outlier zones with counts and their regions, sort in descending order
+outlier_zones_sorted <- outlier_sf %>%
+  st_drop_geometry() %>%
+  arrange(desc(count)) %>%
+  select(SUBZONE_N, REGION_N, count)
 
-Overall, the map shows that adult clothing retail is not evenly distributed but heavily concentrated in a few urban subzones, reinforcing the role of retail hotspots while also exposing underserved areas.
+# List
+print(outlier_zones_sorted)
+```
+
+::: 
+
+The choropleth map depicts the distribution of adult clothing retail outlets across Singapore subzones. Most subzones host only 1–5 outlets, reflected by the lighter shades of red.
+
+However, several subzones highlighted with thick black borders emerge as outliers, with Geylang East (51 outlets) standing out as the largest cluster. Other significant hotspots include Woodlands East (21), Cecil (17), Tampines East (17), Upper Thomson (17), and City Hall (15). These subzones correspond to major commercial hubs, shopping districts, and densely populated town centres across the Central, East, and North Regions.
+
+The concentration of clothing retailers in these areas reflects their role as shopping belts and transport-linked nodes with high consumer traffic. In contrast, peripheral subzones and industrial estates show little to no activity, underscoring spatial inequality in retail access.
+
+Overall, the distribution highlights a few dominant retail hubs while revealing underserved regions with limited fashion retail presence.
 
 ## 5.1 First-order Spatial Point Patterns Analysis
 
@@ -753,6 +838,7 @@ clarkevans.test(biz_47711_ppp,
                 method="MonteCarlo",
                 nsim=99)
 ```
+
 Since p<0.05, we reject the null hypothesis (H0), and conclude that the distribution of Retail sale of clothing for adults is significantly clustered.
 
 ### 5.1.2 Kernel Density Estimation Method
@@ -804,53 +890,97 @@ The KDE map of retail sale of clothing for adults shows strong clustering across
 
 Overall, retail clothing stores are unevenly distributed, with higher concentrations in urban centres and key shopping corridors. This pattern highlights consumer demand for accessible retail in central and regional hubs, while also revealing gaps in suburban and peripheral areas where such services remain less available.
 
-## 5.2 Second-order Spatial Point Patterns Analysis
+## 5.2 Regional analysis- Central Region, East Region and North Region
 
-### 5.2.1 Function estimation
+```{r fig.width=12, fig.height=4}
+par(mfrow = c(1, 3))
+
+# Central Region
+cr <- mpsz_cl %>%
+  filter(REGION_N == "CENTRAL REGION")
+
+cr_owin = as.owin(cr)
+
+biz47711_cr_ppp = biz_47711_ppp[cr_owin]
+biz47711_cr_ppp.km = rescale.ppp(biz47711_cr_ppp, 1000, "km")
+
+plot(unmark(biz47711_cr_ppp.km), 
+  main="Retail sale of clothing in Central Region")
+
+# East Region
+er <- mpsz_cl %>%
+  filter(REGION_N == "EAST REGION")
+
+er_owin = as.owin(er)
+
+biz47711_er_ppp = biz_47711_ppp[er_owin]
+biz47711_er_ppp.km = rescale.ppp(biz47711_er_ppp, 1000, "km")
+
+plot(unmark(biz47711_er_ppp.km), 
+  main="Retail sale of clothing in East Region")
+
+# North Region
+nr <- mpsz_cl %>%
+  filter(REGION_N == "NORTH REGION")
+
+nr_owin = as.owin(nr)
+
+biz47711_nr_ppp = biz_47711_ppp[nr_owin]
+biz47711_nr_ppp.km = rescale.ppp(biz47711_nr_ppp, 1000, "km")
+
+plot(unmark(biz47711_nr_ppp.km), 
+  main="Retail sale of clothing in North Region")
+```
+
+The maps show the distribution of retail clothing outlets across regions. In the Central Region, outlets are highly concentrated in core urban hubs, particularly around commercial districts. The East Region displays a moderate spread, with clusters around major town centers. The North Region shows fewer outlets overall, with businesses mainly concentrated near residential hubs, indicating lower retail density compared to the Central and East regions.
+
+### 5.2.1 Central Region Second-order Spatial Point Patterns Analysis 
+
+#### Function estimation 
 
 ```{r fig.width=10, fig.height=8}
+set.seed(1234)
+
 par(mfrow = c(2, 2))
 
 # G-function
-G_47711 <- Gest(biz_47711_ppp, correction = "border")
-plot(G_47711,
-     main = "G-function")
+G_47711_cr <- Gest(biz47711_cr_ppp, correction = "border")
+plot(G_47711_cr,
+     main = "G-function (Retail sale of clothing in Central Region)")
 
 # F-function
-F_47711 <- Fest(biz_47711_ppp)
-plot(F_47711,
-     main = "F-function")
+F_47711_cr <- Fest(biz47711_cr_ppp)
+plot(F_47711_cr,
+     main = "F-function (Retail sale of clothing in Central Region)")
 
 # K-function
-K_47711 <- Kest(biz_47711_ppp, correction = "Ripley")
-plot(K_47711, . - r ~ r,
+K_47711_cr <- Kest(biz47711_cr_ppp, correction = "Ripley")
+plot(K_47711_cr, . - r ~ r,
      ylab = "K(d) - r", xlab = "d (m)",
-     main = "K-function")
+     main = "K-function (Retail sale of clothing in Central Region)")
 
 # L-function
-L_47711 <- Lest(biz_47711_ppp, correction = "Ripley")
-plot(L_47711, . - r ~ r,
+L_47711_cr <- Lest(biz47711_cr_ppp, correction = "Ripley")
+plot(L_47711_cr, . - r ~ r,
      ylab = "L(d) - r", xlab = "d (m)",
-     main = "L-function")
+     main = "L-function (Retail sale of clothing in Central Region)")
 ```
 
-The G-function shows that the observed nearest-neighbor distances are much shorter than expected under complete spatial randomness (CSR), meaning outlets tend to locate close together. 
+The observed G-function curve rises steeply above the theoretical expectation, showing that retail clothing outlets tend to locate very close to each other. This indicates strong clustering at short distances.
 
-The F-function lies below the CSR curve, suggesting that from random locations, clothing stores are generally farther away than under randomness, highlighting gaps between concentrated retail hubs. 
+The observed F-function function increases faster than the Poisson expectation, meaning that from any random location in the Central Region, the nearest outlet is closer than would be expected under a random pattern. This highlights high accessibility and clustering of outlets.
 
-The K-function further confirms clustering, as the observed values exceed the CSR benchmark across most distances, indicating more neighbors within a given radius than expected. 
+The observed K-function curve remains consistently above the theoretical line across all distances. This suggests that the number of neighboring outlets within varying radii is significantly greater than random, reinforcing evidence of clustering across multiple spatial scales.
 
-Similarly, the L-function shows strong positive deviations from CSR, reinforcing the presence of clustering across both short and larger distances.
+The observed L-function line is much higher than the Poisson baseline, with a strong peak before tapering off. This confirms intensive clustering, particularly at shorter distances, reflecting the Central Region’s role as a concentrated retail hub.
 
-Overall, the results suggest retail clothing stores in Singapore are not evenly spread but are concentrated in commercial hubs and shopping districts, reflecting consumer demand patterns and the attractiveness of established retail agglomerations.
-
-### 5.2.2 Complete Spatial Randomness Test
+#### Complete Spatial Randomness Test
 
 To confirm the observed spatial patterns above, a hypothesis test will be conducted. The hypothesis and test are as follows:
 
-Ho = The distribution of Retail sale of clothing for adults are randomly distributed.
+Ho = The distribution of Retail sale of clothing for adults in Central Region are randomly distributed.
 
-H1= The distribution of Retail sale of clothing for adults are not randomly distributed.
+H1= The distribution of Retail sale of clothing for adults in Central Region are not randomly distributed.
 
 The null hypothesis will be rejected if p-value is smaller than alpha value of 0.001.
 
@@ -858,42 +988,237 @@ The null hypothesis will be rejected if p-value is smaller than alpha value of 0
 par(mfrow = c(2, 2))
 
 # G-function
-G_47711.csr <- envelope(biz_47711_ppp, Gest, nsim = 999)
-plot(G_47711.csr,
-     main = "G-function",
+G_47711_cr.csr <- envelope(biz47711_cr_ppp, Gest, nsim = 999)
+plot(G_47711_cr.csr,
+     main = "G-function (Retail sale of clothing in Central Region)",
      xlab = "r", ylab = "G(r)")
 
 # F-function
-F_47711.csr <- envelope(biz_47711_ppp, Fest, nsim = 999)
-plot(F_47711.csr,
-     main = "F-function",
+F_47711_cr.csr <- envelope(biz47711_cr_ppp, Fest, nsim = 999)
+plot(F_47711_cr.csr,
+     main = "F-function (Retail sale of clothing in Central Region)",
      xlab = "r", ylab = "F(r)")
 
 # K-function
-K_47711.csr <- envelope(biz_47711_ppp, Kest,
+K_47711_cr.csr <- envelope(biz47711_cr_ppp, Kest,
                         nsim = 99, rank = 1, glocal = TRUE)
-plot(K_47711.csr, . - r ~ r,
-     main = "K-function",
+plot(K_47711_cr.csr, . - r ~ r,
+     main = "K-function (Retail sale of clothing in Central Region)",
      xlab = "d (m)", ylab = "K(d) - r")
 
 # L-function
-L_47711.csr <- envelope(biz_47711_ppp, Lest,
+L_47711_cr.csr <- envelope(biz47711_cr_ppp, Lest,
                         nsim = 99, rank = 1, glocal = TRUE)
-plot(L_47711.csr, . - r ~ r,
-     main = "L-function",
+plot(L_47711_cr.csr, . - r ~ r,
+     main = "L-function (Retail sale of clothing in Central Region)",
      xlab = "d (m)", ylab = "L(d) - r")
 ```
 
+The G-function shows the observed curve rising much steeper than the theoretical Poisson line, indicating that retail clothing outlets in the Central Region are clustered at very short distances. 
+
+The F-function further supports this, as the observed line lies well below the theoretical expectation, meaning that from any random location, the nearest outlet is closer than expected under complete spatial randomness. 
+
+The K-function highlights that the observed distribution consistently exceeds the Poisson benchmark, suggesting significantly more neighboring outlets across various distances. 
+
+Similarly, the L-function demonstrates a strong deviation from the theoretical baseline, with values peaking at intermediate distances before stabilizing, which reinforces evidence of clustering. 
+
+Together, these results strongly reject the null hypothesis, showing that the distribution of retail clothing outlets in the Central Region is not random but highly clustered, reflecting commercial concentration in key shopping and business subzones.
+
+### 5.2.2 East Region Second-order Spatial Point Patterns Analysis
+
+#### Function estimation 
+
+```{r fig.width=10, fig.height=8}
+set.seed(1234)
+
+par(mfrow = c(2, 2))
+
+# G-function
+G_47711_er <- Gest(biz47711_er_ppp, correction = "border")
+plot(G_47711_er,
+     main = "G-function (Retail sale of clothing in East Region)")
+
+# F-function
+F_47711_er <- Fest(biz47711_er_ppp)
+plot(F_47711_er,
+     main = "F-function (Retail sale of clothing in East Region)")
+
+# K-function
+K_47711_er <- Kest(biz47711_er_ppp, correction = "Ripley")
+plot(K_47711_er, . - r ~ r,
+     ylab = "K(d) - r", xlab = "d (m)",
+     main = "K-function (Retail sale of clothing in East Region)")
+
+# L-function
+L_47711_er <- Lest(biz47711_er_ppp, correction = "Ripley")
+plot(L_47711_er, . - r ~ r,
+     ylab = "L(d) - r", xlab = "d (m)",
+     main = "L-function (Retail sale of clothing in East Region)")
+```
+
+The G-function for the East Region shows the observed curve rising more steeply than the Poisson expectation, suggesting clustering of retail clothing outlets at short distances. 
+
+The F-function indicates that the observed distribution lies below the theoretical line, meaning that the nearest outlet to a random location tends to be closer than expected, reinforcing evidence of clustering. 
+
+The K-function shows the observed values well above the Poisson reference across all distances, highlighting a consistently higher density of neighboring outlets than random distribution would predict. 
+
+The L-function further confirms this by showing strong positive deviations from the theoretical baseline, particularly at short to medium distances, before gradually leveling off. 
+
+Overall, the results indicate that retail clothing outlets in the East Region are not evenly spread but form distinct clusters, likely influenced by town centers, malls, and transport hubs where commercial activity is concentrated.
+
+#### Complete Spatial Randomness Test
+
+To confirm the observed spatial patterns above, a hypothesis test will be conducted. The hypothesis and test are as follows:
+
+Ho = The distribution of Retail sale of clothing for adults in East Region are randomly distributed.
+
+H1= The distribution of Retail sale of clothing for adults in East Region are not randomly distributed.
+
+The null hypothesis will be rejected if p-value is smaller than alpha value of 0.001.
+
+```{r fig.width=10, fig.height=8}
+par(mfrow = c(2, 2))
+
+# G-function
+G_47711_er.csr <- envelope(biz47711_er_ppp, Gest, nsim = 999)
+plot(G_47711_er.csr,
+     main = "G-function (Retail sale of clothing in East Region)",
+     xlab = "r", ylab = "G(r)")
+
+# F-function
+F_47711_er.csr <- envelope(biz47711_er_ppp, Fest, nsim = 999)
+plot(F_47711_er.csr,
+     main = "F-function (Retail sale of clothing in East Region)",
+     xlab = "r", ylab = "F(r)")
+
+# K-function
+K_47711_er.csr <- envelope(biz47711_er_ppp, Kest,
+                        nsim = 99, rank = 1, glocal = TRUE)
+plot(K_47711_er.csr, . - r ~ r,
+     main = "K-function (Retail sale of clothing in East Region)",
+     xlab = "d (m)", ylab = "K(d) - r")
+
+# L-function
+L_47711_er.csr <- envelope(biz47711_er_ppp, Lest,
+                        nsim = 99, rank = 1, glocal = TRUE)
+plot(L_47711_er.csr, . - r ~ r,
+     main = "L-function (Retail sale of clothing in East Region)",
+     xlab = "d (m)", ylab = "L(d) - r")
+```
+
+The G-function for the East Region shows the observed curve well above the theoretical Poisson expectation, indicating strong clustering of retail clothing outlets at short distances. 
+
+The F-function further supports this, as the observed distribution lies below the theoretical curve, meaning outlets are generally closer to any random location than expected under randomness. 
+
+The K-function demonstrates that observed values exceed the Poisson baseline across all distances, suggesting higher densities of outlets than a random distribution would predict. 
+
+Similarly, the L-function shows positive deviations from the theoretical line, particularly at small to medium distances, before gradually stabilizing. 
+
+Together, these functions reveal that retail clothing outlets in the East Region are not randomly distributed but instead cluster significantly around key commercial centers and town hubs. As the observed patterns deviate consistently from randomness, the null hypothesis (Ho) is rejected in favor of clustering (H1).
+
+### 5.2.3 North Region Second-order Spatial Point Patterns Analysis
+
+#### Function estimation 
+
+```{r fig.width=10, fig.height=8}
+set.seed(1234)
+
+par(mfrow = c(2, 2))
+
+# G-function
+G_47711_nr <- Gest(biz47711_nr_ppp, correction = "border")
+plot(G_47711_nr,
+     main = "G-function (Retail sale of clothing in North Region)")
+
+# F-function
+F_47711_nr <- Fest(biz47711_nr_ppp)
+plot(F_47711_nr,
+     main = "F-function (Retail sale of clothing in North Region)")
+
+# K-function
+K_47711_nr <- Kest(biz47711_nr_ppp, correction = "Ripley")
+plot(K_47711_nr, . - r ~ r,
+     ylab = "K(d) - r", xlab = "d (m)",
+     main = "K-function (Retail sale of clothing in North Region)")
+
+# L-function
+L_47711_nr <- Lest(biz47711_nr_ppp, correction = "Ripley")
+plot(L_47711_nr, . - r ~ r,
+     ylab = "L(d) - r", xlab = "d (m)",
+     main = "L-function (Retail sale of clothing in North Region)")
+```
+
+The G-function for the North Region shows the observed curve consistently above the Poisson expectation, indicating clustering of retail clothing outlets at shorter distances. This suggests that outlets are located closer to each other than would be expected under randomness.
+
+The F-function highlights that the observed distribution rises more slowly than the theoretical expectation, suggesting that retail clothing outlets are not evenly spread but instead leave larger gaps in some areas before clustering in others. This reflects uneven accessibility across the region.
+
+The K-function confirms clustering, with the observed curve well above the Poisson line across all distances. This indicates higher outlet densities in certain pockets of the North Region compared to a random pattern.
+
+Finally, the L-function reinforces clustering, showing strong positive deviations from the Poisson expectation, particularly up to mid-range distances. This suggests retail clothing outlets in the North Region are spatially concentrated in specific commercial or residential hubs.
+
+#### Complete Spatial Randomness Test
+
+To confirm the observed spatial patterns above, a hypothesis test will be conducted. The hypothesis and test are as follows:
+
+Ho = The distribution of Retail sale of clothing for adults in North Region are randomly distributed.
+
+H1= The distribution of Retail sale of clothing for adults in North Region are not randomly distributed.
+
+The null hypothesis will be rejected if p-value is smaller than alpha value of 0.001.
+
+```{r fig.width=10, fig.height=8}
+par(mfrow = c(2, 2))
+
+# G-function
+G_47711_nr.csr <- envelope(biz47711_nr_ppp, Gest, nsim = 999)
+plot(G_47711_nr.csr,
+     main = "G-function (Retail sale of clothing in North Region)",
+     xlab = "r", ylab = "G(r)")
+
+# F-function
+F_47711_nr.csr <- envelope(biz47711_nr_ppp, Fest, nsim = 999)
+plot(F_47711_nr.csr,
+     main = "F-function (Retail sale of clothing in North Region)",
+     xlab = "r", ylab = "F(r)")
+
+# K-function
+K_47711_nr.csr <- envelope(biz47711_nr_ppp, Kest,
+                        nsim = 99, rank = 1, glocal = TRUE)
+plot(K_47711_nr.csr, . - r ~ r,
+     main = "K-function (Retail sale of clothing in North Region)",
+     xlab = "d (m)", ylab = "K(d) - r")
+
+# L-function
+L_47711_nr.csr <- envelope(biz47711_nr_ppp, Lest,
+                        nsim = 99, rank = 1, glocal = TRUE)
+plot(L_47711_nr.csr, . - r ~ r,
+     main = "L-function (Retail sale of clothing in North Region)",
+     xlab = "d (m)", ylab = "L(d) - r")
+```
+
+The G-function shows that the observed distribution of retail clothing outlets lies well above the theoretical Poisson curve, indicating strong clustering at short distances. This suggests that stores in the North Region are more tightly packed than expected under randomness.
+
+The F-function reveals that the observed curve rises much slower than the theoretical expectation, meaning that empty spaces are larger and outlets are concentrated in fewer subzones. This points to uneven accessibility across the region, where residents in some areas must travel further to reach outlets.
+
+The K-function confirms clustering, with the observed line consistently exceeding the Poisson baseline. This highlights that clothing outlets form dense clusters rather than being randomly scattered.
+
+Finally, the L-function shows a marked positive deviation from the theoretical line, particularly up to mid-range distances, reinforcing evidence of clustering. 
+
+Since observed patterns fall outside the simulation envelope, the null hypothesis of complete spatial randomness is rejected.
 
 # 6 Analysis of Restaurants and Cafés
+
+::: panel-tabset
+
+## Choropleth Map
 
 ```{r}
 # Count number of businesses in each subzone
 biz_count_56111 <- biz_56111_sf %>%
-  st_join(mpsz_cl, join = st_within) %>%   # assign each business point to subzone
+  st_join(mpsz_cl, join = st_within) %>%  
   st_drop_geometry() %>%
   group_by(SUBZONE_N) %>%
-  summarise(count = n())                   # count businesses per subzone
+  summarise(count = n())  
 
 # Join count back to subzone polygons
 mpsz_biz56111 <- mpsz_cl %>%
@@ -925,11 +1250,26 @@ tm_shape(mpsz_biz56111) +
   tm_layout(main.title = "Distribution of Restaurants and Cafés")
 ```
 
-The map shows the distribution of restaurants and cafés across Singapore subzones. Most areas host between 1 and 9 establishments, reflected in lighter shades of green. 
+## Outlier List
 
-However, subzones highlighted with thick black borders stand out as outliers, with counts reaching up to 84. These high-density clusters are primarily concentrated in central regions and selected eastern areas, coinciding with Singapore’s major commercial, entertainment, and lifestyle hubs. The concentration reflects strong consumer demand, urban vibrancy, and proximity to transport networks, which attract food and beverage businesses. Peripheral or less populated areas display sparse distribution, indicating limited accessibility to such amenities. 
+```{r}
+# Extract outlier zones with counts and their regions, sort in descending order
+outlier_zones_sorted <- outlier_sf %>%
+  st_drop_geometry() %>%
+  arrange(desc(count)) %>%
+  select(SUBZONE_N, REGION_N, count)
 
-Overall, the pattern reveals significant clustering of restaurants and cafés in key urban centres, supporting their role as social and commercial anchors while also highlighting spatial disparities, as residents in outlying areas may face fewer choices. This distribution underlines the importance of urban planning to balance accessibility and commercial concentration.
+# List
+print(outlier_zones_sorted)
+```
+
+::: 
+
+The choropleth map shows the distribution of restaurants and cafés across Singapore subzones. Most subzones accommodate between 1 and 9 establishments, as indicated by lighter green shades.
+
+However, several subzones highlighted with thick black borders are clear outliers, with counts ranging from 20 up to 84. The top outliers include Chinatown (84), Lavender (70), Geylang East (62), and Kampong Ubi (54), all located in the Central Region. Other notable clusters appear in subzones such as Little India, Aljunied, and City Hall, which are also urban hubs with strong cultural, commercial, and transport significance. Outliers beyond the Central Region, such as Kaki Bukit (East), Bukit Batok South (West), and Woodlands East (North), reflect localized demand in residential or regional centres.
+
+Overall, the distribution is highly clustered in the Central Region, reinforcing its role as Singapore’s main F&B hub, while peripheral areas remain relatively underserved.
 
 ## 6.1 First-order Spatial Point Patterns Analysis
 
@@ -951,6 +1291,7 @@ clarkevans.test(biz_56111_ppp,
                 method="MonteCarlo",
                 nsim=99)
 ```
+
 Since p<0.05, we reject the null hypothesis (H0), and conclude that the distribution of Restaurants and Cafés is significantly clustered.
 
 ### 6.1.2 Kernel Density Estimation Method
@@ -1002,53 +1343,72 @@ The KDE map of restaurants and cafés shows strong clustering in Singapore. The 
 
 Overall, restaurants and cafés are unevenly distributed, with clear concentration in city and regional centres where demand is highest. This reflects urban lifestyle patterns, where food and beverage outlets thrive in commercial cores, transport nodes, and densely populated neighbourhoods. At the same time, the low densities in outlying areas suggest opportunities for further development to enhance dining accessibility in suburban and peripheral zones.
 
-## 6.2 Second-order Spatial Point Patterns Analysis
+## 6.2 Regional analysis - Central Region
 
-### 6.2.1 Function estimation
+```{r}
+cr <- mpsz_cl %>%
+  filter(REGION_N == "CENTRAL REGION")
+
+cr_owin = as.owin(cr)
+
+biz56111_cr_ppp = biz_56111_ppp[cr_owin]
+biz56111_cr_ppp.km = rescale.ppp(biz56111_cr_ppp, 1000, "km")
+
+plot(unmark(biz56111_cr_ppp.km), 
+  main="Restaurants and Cafés in Central Region")
+```
+
+The map shows restaurants and cafés in the Central Region, with strong clustering in outlier subzones such as Chinatown, Lavender, and Geylang East. These areas dominate the food landscape, while peripheral zones have fewer establishments.
+
+### 6.2.1 Central Region Second-order Spatial Point Patterns Analysis
+
+#### Function estimation 
 
 ```{r fig.width=10, fig.height=8}
+set.seed(1234)
+
 par(mfrow = c(2, 2))
 
 # G-function
-G_56111 <- Gest(biz_56111_ppp, correction = "border")
-plot(G_56111,
-     main = "G-function")
+G_56111_cr <- Gest(biz56111_cr_ppp, correction = "border")
+plot(G_56111_cr,
+     main = "G-function (Restaurants and Cafés in Central Region)")
 
 # F-function
-F_56111 <- Fest(biz_56111_ppp)
-plot(F_56111,
-     main = "F-function")
+F_56111_cr <- Fest(biz56111_cr_ppp)
+plot(F_56111_cr,
+     main = "F-function (Restaurants and Cafés in Central Region)")
 
 # K-function
-K_56111 <- Kest(biz_56111_ppp, correction = "Ripley")
-plot(K_56111, . - r ~ r,
+K_56111_cr <- Kest(biz56111_cr_ppp, correction = "Ripley")
+plot(K_56111_cr, . - r ~ r,
      ylab = "K(d) - r", xlab = "d (m)",
-     main = "K-function")
+     main = "K-function (Restaurants and Cafés in Central Region)")
 
 # L-function
-L_56111 <- Lest(biz_56111_ppp, correction = "Ripley")
-plot(L_56111, . - r ~ r,
+L_56111_cr <- Lest(biz56111_cr_ppp, correction = "Ripley")
+plot(L_56111_cr, . - r ~ r,
      ylab = "L(d) - r", xlab = "d (m)",
-     main = "L-function")
+     main = "L-function (Restaurants and Cafés in Central Region)")
 ```
 
-The G-function rises steeply above the theoretical Poisson curve, showing that restaurants and cafés are located much closer together than expected under complete spatial randomness. 
+The G-function rises steeply above the theoretical Poisson line, showing that restaurants are located very close to one another, reflecting a clustered distribution at short distances. 
 
-The F-function also lies above the CSR line, indicating that empty spaces between restaurants and cafés are smaller than random expectation, further confirming clustering. 
+The F-function also lies well above the Poisson expectation, indicating that the average distance from a random point to the nearest restaurant is smaller than expected under randomness, further confirming clustering. 
 
-The K-function shows observed values consistently above the theoretical curve, suggesting significant clustering across multiple distance scales, with intensity increasing as distance grows. 
+The K-function demonstrates a sharp increase above the theoretical line, with values growing rapidly as distance increases, suggesting significant aggregation across multiple spatial scales. 
 
-Similarly, the L-function is well above the CSR baseline, reinforcing the strong clustering effect across Singapore.
+Similarly, the L-function remains far above the Poisson baseline, reinforcing that clustering persists across both short and long distances. 
 
-Overall, these results indicate that Restaurants and Cafés are not randomly distributed but heavily concentrated in specific subzones.
+Overall, all four functions consistently highlight that Restaurants and Cafés in the Central Region are highly concentrated, particularly around dense commercial and lifestyle hubs, rather than being randomly or evenly distributed.
 
-### 6.2.2 Complete Spatial Randomness Test
+#### Complete Spatial Randomness Test
 
 To confirm the observed spatial patterns above, a hypothesis test will be conducted. The hypothesis and test are as follows:
 
-Ho = The distribution of Restaurants and Cafés are randomly distributed.
+Ho = The distribution of Restaurants and Cafés in Central Region are randomly distributed.
 
-H1= The distribution of Restaurants and Cafés are not randomly distributed.
+H1= The distribution of Restaurants and Cafés in Central Region are not randomly distributed.
 
 The null hypothesis will be rejected if p-value is smaller than alpha value of 0.001.
 
@@ -1056,46 +1416,59 @@ The null hypothesis will be rejected if p-value is smaller than alpha value of 0
 par(mfrow = c(2, 2))
 
 # G-function
-G_56111.csr <- envelope(biz_56111_ppp, Gest, nsim = 999)
-plot(G_56111.csr,
-     main = "G-function",
+G_56111_cr.csr <- envelope(biz56111_cr_ppp, Gest, nsim = 999)
+plot(G_56111_cr.csr,
+     main = "G-function (Restaurants and Cafés in Central Region)",
      xlab = "r", ylab = "G(r)")
 
 # F-function
-F_56111.csr <- envelope(biz_56111_ppp, Fest, nsim = 999)
-plot(F_56111.csr,
-     main = "F-function",
+F_56111_cr.csr <- envelope(biz56111_cr_ppp, Fest, nsim = 999)
+plot(F_56111_cr.csr,
+     main = "F-function (Restaurants and Cafés in Central Region)",
      xlab = "r", ylab = "F(r)")
 
 # K-function
-K_56111.csr <- envelope(biz_56111_ppp, Kest,
+K_56111_cr.csr <- envelope(biz56111_cr_ppp, Kest,
                         nsim = 99, rank = 1, glocal = TRUE)
-plot(K_56111.csr, . - r ~ r,
-     main = "K-function",
+plot(K_56111_cr.csr, . - r ~ r,
+     main = "K-function (Restaurants and Cafés in Central Region)",
      xlab = "d (m)", ylab = "K(d) - r")
 
 # L-function
-L_56111.csr <- envelope(biz_56111_ppp, Lest,
+L_56111_cr.csr <- envelope(biz56111_cr_ppp, Lest,
                         nsim = 99, rank = 1, glocal = TRUE)
-plot(L_56111.csr, . - r ~ r,
-     main = "L-function",
+plot(L_56111_cr.csr, . - r ~ r,
+     main = "L-function (Restaurants and Cafés in Central Region)",
      xlab = "d (m)", ylab = "L(d) - r")
 ```
 
+The G-function rises sharply above the theoretical Poisson line, suggesting restaurants are located closer to each other than expected under randomness, highlighting significant clustering at short distances. 
+
+The F-function also shows observed values above the theoretical line, indicating that random points are on average closer to the nearest restaurant, further confirming clustering.
+
+The K-function increases far above the theoretical expectation, showing that the density of restaurants within a given distance is much higher than under complete spatial randomness. 
+
+Similarly, the L-function remains well above the Poisson baseline across multiple scales, reinforcing strong aggregation rather than dispersion.
+
+Together, these functions consistently demonstrate that Restaurants and Cafés in the Central Region are highly clustered, concentrated around commercial hubs and lifestyle districts, and the observed distribution clearly deviates from randomness.
 
 # 7 Analysis of Event/Concert Organisers
+
+::: panel-tabset
+
+## Choropleth Map
 
 ```{r}
 # Count number of businesses in each subzone
 biz_count_82303 <- biz_82303_sf %>%
-  st_join(mpsz_cl, join = st_within) %>%   # assign each business point to subzone
+  st_join(mpsz_cl, join = st_within) %>%  
   st_drop_geometry() %>%
   group_by(SUBZONE_N) %>%
-  summarise(count = n())                   # count businesses per subzone
+  summarise(count = n())      
 
 # Join count back to subzone polygons
 mpsz_biz82303 <- mpsz_cl %>%
-  left_join(biz_count_56111, by = "SUBZONE_N")
+  left_join(biz_count_82303, by = "SUBZONE_N")
 
 # Identify outliers by boxplot rule
 stats_cnt    <- boxplot.stats(mpsz_biz82303$count)
@@ -1123,11 +1496,26 @@ tm_shape(mpsz_biz82303) +
   tm_layout(main.title = "Distribution of Event/Concert Organisers")
 ```
 
-The map illustrates the distribution of event and concert organisers across Singapore’s subzones. Most areas host between 1 and 9 organisers, shown in lighter shades of orange. 
+## Outlier List
 
-However, several subzones highlighted with thick black borders are identified as outliers, with significantly higher counts reaching up to 84. These outliers are concentrated in the central and eastern regions, reflecting Singapore’s role as a hub for large-scale events, exhibitions, and entertainment industries. Their presence in these zones aligns with strong infrastructure, accessibility, and high population density, which are crucial for sustaining event-related businesses. In contrast, peripheral and residential areas display sparse or minimal presence, underscoring uneven distribution. 
+```{r}
+# Extract outlier zones with counts and their regions, sort in descending order
+outlier_zones_sorted <- outlier_sf %>%
+  st_drop_geometry() %>%
+  arrange(desc(count)) %>%
+  select(SUBZONE_N, REGION_N, count)
 
-Overall, the map reveals that event and concert organisers cluster in established commercial and cultural centres, benefiting from higher demand and facilities. This highlights both the centralisation of the industry and the potential accessibility gap for residents in outer subzones.
+# List
+print(outlier_zones_sorted)
+```
+
+::: 
+
+The choropleth map shows the distribution of event and concert organisers across Singapore’s subzones. Most areas record only a few establishments, typically between 1 and 5, as indicated by the lighter shades of orange.
+
+However, several subzones outlined in black stand out as outliers, with significantly higher counts. Geylang East (49), Kampong Ubi (32), and Cecil (26) are the most prominent, all located in the Central Region, followed by subzones such as Upper Thomson (26), City Hall (21), and Boat Quay (20). A smaller cluster of outliers also appears in Woodlands East (18, North Region) and Tampines East (11, East Region). These subzones coincide with Singapore’s major commercial, cultural, and entertainment hubs, where infrastructure and accessibility support large-scale events and business concentration.
+
+Overall, the distribution highlights the centralisation of event organisers in urban cores, leaving peripheral residential areas with sparse representation.
 
 ## 7.1 First-order Spatial Point Patterns Analysis
 
@@ -1201,53 +1589,61 @@ The KDE map of event and concert organisers shows a clustered but more dispersed
 
 Overall, event and concert organisers are unevenly distributed, with clear concentration in city centres where large-scale events and performances are most viable. The presence of smaller clusters across other regions indicates secondary hubs of activity, but many suburban and peripheral areas remain underrepresented. This reflects the dependence of the events industry on centralised venues and transport accessibility, while also highlighting opportunities for decentralised growth.
 
-## 7.2 Second-order Spatial Point Patterns Analysis
+## 7.2 Regional analysis - Central Region
 
-### 7.2.1 Function estimation
+```{r}
+cr <- mpsz_cl %>%
+  filter(REGION_N == "CENTRAL REGION")
+
+cr_owin = as.owin(cr)
+
+biz82303_cr_ppp = biz_82303_ppp[cr_owin]
+biz82303_cr_ppp.km = rescale.ppp(biz82303_cr_ppp, 1000, "km")
+
+plot(unmark(biz82303_cr_ppp.km), 
+  main="Event/Concert Organisers in Central Region")
+```
+The map shows the distribution of event and concert organisers in the Central Region, with notable clustering in key subzones such as Geylang East, Kampong Ubi, and Cecil. These areas act as hubs for entertainment and cultural activities, while other subzones show a more dispersed pattern.
+
+### 7.2.1 Central Region Second-order Spatial Point Patterns Analysis
+
+#### Function estimation 
 
 ```{r fig.width=10, fig.height=8}
+set.seed(1234)
+
 par(mfrow = c(2, 2))
 
 # G-function
-G_82303 <- Gest(biz_82303_ppp, correction = "border")
-plot(G_82303,
-     main = "G-function")
+G_82303_cr <- Gest(biz82303_cr_ppp, correction = "border")
+plot(G_82303_cr,
+     main = "G-function (Event/Concert Organisers in Central Region)")
 
 # F-function
-F_82303 <- Fest(biz_82303_ppp)
-plot(F_82303,
-     main = "F-function")
+F_82303_cr <- Fest(biz82303_cr_ppp)
+plot(F_82303_cr,
+     main = "F-function (Event/Concert Organisers in Central Region)")
 
 # K-function
-K_82303 <- Kest(biz_82303_ppp, correction = "Ripley")
-plot(K_82303, . - r ~ r,
+K_82303_cr <- Kest(biz82303_cr_ppp, correction = "Ripley")
+plot(K_82303_cr, . - r ~ r,
      ylab = "K(d) - r", xlab = "d (m)",
-     main = "K-function")
+     main = "K-function (Event/Concert Organisers in Central Region)")
 
 # L-function
-L_82303 <- Lest(biz_82303_ppp, correction = "Ripley")
-plot(L_82303, . - r ~ r,
+L_82303_cr <- Lest(biz82303_cr_ppp, correction = "Ripley")
+plot(L_82303_cr, . - r ~ r,
      ylab = "L(d) - r", xlab = "d (m)",
-     main = "L-function")
+     main = "L-function (Event/Concert Organisers in Central Region)")
 ```
 
-The G-function rises steeply above the theoretical Poisson curve, meaning that nearest-neighbour distances are shorter than expected, consistent with clustering at small spatial scales. 
-
-The F-function also lies above the Poisson expectation, showing that random locations are on average closer to an organiser than if the distribution were random, again confirming clustering.
-
-The K-function increases more rapidly than the Poisson benchmark, with the observed curve well above the theoretical line. This indicates that at larger distances, there are consistently more Event/Concert Organisers than would be expected under complete spatial randomness. 
-
-The L-function, a variance-stabilised version of the K-function, also lies far above the theoretical expectation, providing further evidence of clustering across multiple scales.
-
-Overall, the results show that Event/Concert Organisers in Singapore are spatially clustered, particularly around key central and commercial hubs, reflecting strong demand in high-density urban areas.
-
-### 7.2.2 Complete Spatial Randomness Test
+#### Complete Spatial Randomness Test
 
 To confirm the observed spatial patterns above, a hypothesis test will be conducted. The hypothesis and test are as follows:
 
-Ho = The distribution of Event/Concert Organisers are randomly distributed.
+Ho = The distribution of Event/Concert Organisers in Central Region are randomly distributed.
 
-H1= The distribution of Event/Concert Organisers are not randomly distributed.
+H1= The distribution of Event/Concert Organisers in Central Region are not randomly distributed.
 
 The null hypothesis will be rejected if p-value is smaller than alpha value of 0.001.
 
@@ -1255,29 +1651,58 @@ The null hypothesis will be rejected if p-value is smaller than alpha value of 0
 par(mfrow = c(2, 2))
 
 # G-function
-G_82303.csr <- envelope(biz_82303_ppp, Gest, nsim = 999)
-plot(G_82303.csr,
-     main = "G-function",
+G_82303_cr.csr <- envelope(biz82303_cr_ppp, Gest, nsim = 999)
+plot(G_82303_cr.csr,
+     main = "G-function (Event/Concert Organisers in Central Region)",
      xlab = "r", ylab = "G(r)")
 
 # F-function
-F_82303.csr <- envelope(biz_82303_ppp, Fest, nsim = 999)
-plot(F_82303.csr,
-     main = "F-function",
+F_82303_cr.csr <- envelope(biz82303_cr_ppp, Fest, nsim = 999)
+plot(F_82303_cr.csr,
+     main = "F-function (Event/Concert Organisers in Central Region)",
      xlab = "r", ylab = "F(r)")
 
 # K-function
-K_82303.csr <- envelope(biz_82303_ppp, Kest,
+K_82303_cr.csr <- envelope(biz82303_cr_ppp, Kest,
                         nsim = 99, rank = 1, glocal = TRUE)
-plot(K_82303.csr, . - r ~ r,
-     main = "K-function",
+plot(K_82303_cr.csr, . - r ~ r,
+     main = "K-function (Event/Concert Organisers in Central Region)",
      xlab = "d (m)", ylab = "K(d) - r")
 
 # L-function
-L_82303.csr <- envelope(biz_82303_ppp, Lest,
+L_82303_cr.csr <- envelope(biz82303_cr_ppp, Lest,
                         nsim = 99, rank = 1, glocal = TRUE)
-plot(L_82303.csr, . - r ~ r,
-     main = "L-function",
+plot(L_82303_cr.csr, . - r ~ r,
+     main = "L-function (Event/Concert Organisers in Central Region)",
      xlab = "d (m)", ylab = "L(d) - r")
 ```
 
+The G-function rises steeply above the theoretical expectation, indicating many organisers are located very close to each other. 
+
+The F-function also lies above the random distribution, showing that random points are nearer to organisers than expected. 
+
+The K-function consistently exceeds the theoretical curve, reflecting higher densities of organisers within various distances. 
+
+Similarly, the L-function is well above the baseline, especially between 500 and 2000 metres, confirming clustering across medium spatial scales.
+
+Since the observed functions deviate significantly from the theoretical random distribution and fall outside the simulation envelope, the results demonstrate strong spatial clustering. Therefore, the null hypothesis is rejected.
+
+# 8 Conclusion
+
+1 Zoning & floorspace allocation:
+Clustering of restaurants/cafés around the city core and MRT nodes argues for safeguarding and intensifying F&B floorspace in those precincts through mixed-use/commercial zoning, higher plot ratios and permissive ground-floor uses. This matches Singaporeans’ lifestyle of dining out frequently, meeting in malls/shophouses, and seeking air-conditioned venues near transit. Retail clothing, concentrated in a few hubs, supports planning “comparison-retail” corridors in regional centres; meanwhile, gyms—patchier and residential-led—should be allowed as ancillary uses in new HDB/commercial blocks to advance a 15-minute-city where daily fitness is within walking distance.
+
+2 Location guidance & development management:
+Outlier subzones help manage saturation and steer new entrants. In very dense F&B/event streets, use frontage caps, exhaust/noise controls and queue management; direct applicants to adjacent streets with capacity. In cold spots, pilot pop-ups or white-site tenders before permanent rezoning. This balances vibrancy with liveability—important in Singapore where residents prize clean, orderly neighbourhoods yet enjoy lively eating and entertainment streets.
+
+3 Mobility & public realm:
+Hotspots cluster around MRT interchanges; strengthen last-mile walking/cycling links, sheltered connectors, loading bays and lighting. For event organisers near major venues, designate event logistics zones (coach lay-bys, barricade anchor points, sound buffers, dispersal routes). This aligns with a transit-centric lifestyle: most outings—shopping, meals, concerts—are planned around MRT accessibility and comfortable, weather-protected pedestrian networks.
+
+4 Equity & health outcomes:
+Spatial gaps show where everyday services are scarce. Bake fitness rooms, affordable eateries and daily-needs retail into new community hubs, sports centres and town-centre upgrades, reserving units via planning conditions or public leasing. This supports Singaporeans’ emphasis on active ageing, school-to-CCA commutes, and family meals close to home, reducing travel time and expense for heartland households.
+
+5 Economic resilience:
+Registrations show F&B most vibrant, retail clothing stable, events moderating, gyms variable. Calibrate support accordingly: incubator kitchens and shorter licenses for pop-up events; longer tenures for anchor retail to stabilise nascent corridors; flexible unit sizes for gyms. This echoes Singapore’s fast-evolving consumer habits—late-night dining, festival seasons, and mall-based shopping—while cushioning small operators against demand swings.
+
+6 Monitoring & evidence-led reviews:
+Re-run G/F/K/L + CSR envelopes annually by region. Tie thresholds (e.g., K above a set value within 800 m) to actions: pause new F&B in oversaturated streets; activate incentives in underserved towns. Public dashboards can inform residents and entrepreneurs—consistent with Singapore’s data-driven governance and the public’s appetite for transparent, pragmatic planning that keeps neighbourhoods both lively and livable.
