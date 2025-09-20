@@ -658,9 +658,11 @@ plot(unmark(biz93111_cr_ppp.km),
 
 The map shows the spatial distribution of fitness centres and gymnasiums in the Central Region of Singapore, with notable clustering in the downtown and surrounding urban areas.
 
-### 4.2.1 Central Region Second-order Spatial Point Patterns Analysis
+### 4.2.1 Central Region 
 
-#### Function estimation 
+#### 4.2.1.1 Second-order Spatial Point Patterns Analysis 
+
+##### Function estimation 
 
 ```{r fig.width=10, fig.height=8}
 set.seed(1234)
@@ -700,7 +702,7 @@ The L-function further reinforces this, showing values much higher than the theo
 
 Overall, the Central Region exhibits strong spatial clustering of fitness centres, reflecting demand around dense urban hubs.
 
-#### Complete Spatial Randomness Test
+##### Complete Spatial Randomness Test
 
 To confirm the observed spatial patterns above, a hypothesis test will be conducted. The hypothesis and test are as follows:
 
@@ -749,6 +751,10 @@ The K-function lies consistently above the theoretical line and outside the enve
 The L-function also rises well above the expected line, showing strong clustering up to ~2000m before tapering.
 
 Since observed functions consistently deviate from the theoretical Poisson distribution and cross outside the simulation envelopes, the null hypothesis (Ho) is rejected. Thus, Fitness Centres and Gymnasiums in the Central Region are not randomly distributed but exhibit significant spatial clustering.
+
+#### 4.2.1.2 Spatio-Temporal Point Patterns Analysis
+
+
 
 
 # 5 Analysis of Retail sale of clothing for adults
@@ -936,7 +942,9 @@ The maps show the distribution of retail clothing outlets across regions. In the
 
 ### 5.2.1 Central Region Second-order Spatial Point Patterns Analysis 
 
-#### Function estimation 
+#### 5.2.1.1 Second-order Spatial Point Patterns Analysis 
+
+##### Function estimation 
 
 ```{r fig.width=10, fig.height=8}
 set.seed(1234)
@@ -974,7 +982,7 @@ The observed K-function curve remains consistently above the theoretical line ac
 
 The observed L-function line is much higher than the Poisson baseline, with a strong peak before tapering off. This confirms intensive clustering, particularly at shorter distances, reflecting the Central Region’s role as a concentrated retail hub.
 
-#### Complete Spatial Randomness Test
+##### Complete Spatial Randomness Test
 
 To confirm the observed spatial patterns above, a hypothesis test will be conducted. The hypothesis and test are as follows:
 
@@ -1024,9 +1032,13 @@ Similarly, the L-function demonstrates a strong deviation from the theoretical b
 
 Together, these results strongly reject the null hypothesis, showing that the distribution of retail clothing outlets in the Central Region is not random but highly clustered, reflecting commercial concentration in key shopping and business subzones.
 
+#### 5.2.1.2 Spatio-Temporal Point Patterns Analysis
+
 ### 5.2.2 East Region Second-order Spatial Point Patterns Analysis
 
-#### Function estimation 
+#### 5.2.2.1 Second-order Spatial Point Patterns Analysis 
+
+##### Function estimation 
 
 ```{r fig.width=10, fig.height=8}
 set.seed(1234)
@@ -1066,7 +1078,7 @@ The L-function further confirms this by showing strong positive deviations from 
 
 Overall, the results indicate that retail clothing outlets in the East Region are not evenly spread but form distinct clusters, likely influenced by town centers, malls, and transport hubs where commercial activity is concentrated.
 
-#### Complete Spatial Randomness Test
+##### Complete Spatial Randomness Test
 
 To confirm the observed spatial patterns above, a hypothesis test will be conducted. The hypothesis and test are as follows:
 
@@ -1116,9 +1128,16 @@ Similarly, the L-function shows positive deviations from the theoretical line, p
 
 Together, these functions reveal that retail clothing outlets in the East Region are not randomly distributed but instead cluster significantly around key commercial centers and town hubs. As the observed patterns deviate consistently from randomness, the null hypothesis (Ho) is rejected in favor of clustering (H1).
 
+#### 5.2.2.2 Spatio-Temporal Point Patterns Analysis
+
+
+
+
 ### 5.2.3 North Region Second-order Spatial Point Patterns Analysis
 
-#### Function estimation 
+#### 5.2.3.1 Second-order Spatial Point Patterns Analysis 
+
+##### Function estimation 
 
 ```{r fig.width=10, fig.height=8}
 set.seed(1234)
@@ -1156,7 +1175,7 @@ The K-function confirms clustering, with the observed curve well above the Poiss
 
 Finally, the L-function reinforces clustering, showing strong positive deviations from the Poisson expectation, particularly up to mid-range distances. This suggests retail clothing outlets in the North Region are spatially concentrated in specific commercial or residential hubs.
 
-#### Complete Spatial Randomness Test
+##### Complete Spatial Randomness Test
 
 To confirm the observed spatial patterns above, a hypothesis test will be conducted. The hypothesis and test are as follows:
 
@@ -1205,6 +1224,11 @@ The K-function confirms clustering, with the observed line consistently exceedin
 Finally, the L-function shows a marked positive deviation from the theoretical line, particularly up to mid-range distances, reinforcing evidence of clustering. 
 
 Since observed patterns fall outside the simulation envelope, the null hypothesis of complete spatial randomness is rejected.
+
+#### 5.2.3.2 Spatio-Temporal Point Patterns Analysis
+
+
+
 
 # 6 Analysis of Restaurants and Cafés
 
@@ -1362,7 +1386,9 @@ The map shows restaurants and cafés in the Central Region, with strong clusteri
 
 ### 6.2.1 Central Region Second-order Spatial Point Patterns Analysis
 
-#### Function estimation 
+#### 6.2.1.1 Second-order Spatial Point Patterns Analysis 
+
+##### Function estimation 
 
 ```{r fig.width=10, fig.height=8}
 set.seed(1234)
@@ -1402,7 +1428,7 @@ Similarly, the L-function remains far above the Poisson baseline, reinforcing th
 
 Overall, all four functions consistently highlight that Restaurants and Cafés in the Central Region are highly concentrated, particularly around dense commercial and lifestyle hubs, rather than being randomly or evenly distributed.
 
-#### Complete Spatial Randomness Test
+##### Complete Spatial Randomness Test
 
 To confirm the observed spatial patterns above, a hypothesis test will be conducted. The hypothesis and test are as follows:
 
@@ -1607,7 +1633,9 @@ The map shows the distribution of event and concert organisers in the Central Re
 
 ### 7.2.1 Central Region Second-order Spatial Point Patterns Analysis
 
-#### Function estimation 
+#### 4.2.1.1 Second-order Spatial Point Patterns Analysis 
+
+##### Function estimation 
 
 ```{r fig.width=10, fig.height=8}
 set.seed(1234)
@@ -1637,7 +1665,7 @@ plot(L_82303_cr, . - r ~ r,
      main = "L-function (Event/Concert Organisers in Central Region)")
 ```
 
-#### Complete Spatial Randomness Test
+##### Complete Spatial Randomness Test
 
 To confirm the observed spatial patterns above, a hypothesis test will be conducted. The hypothesis and test are as follows:
 
