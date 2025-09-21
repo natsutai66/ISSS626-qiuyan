@@ -10,7 +10,7 @@ execute:
   freeze: true
 ---
 
-This project analyzes the spatial and temporal distribution of four key business types in Singapore—Fitness Centres & Gymnasiums, Retail Clothing Stores, Restaurants & Cafés, and Event/Concert Organisers—between January 2024 and June 2025. Using registration data, choropleth maps, kernel density estimation, and spatial point pattern analyses (G, F, K, L functions with CSR tests), the study identifies hotspots, clustering patterns, and underserved areas. Findings reveal strong centralisation of lifestyle and retail activities in the Central Region, moderate clustering in East and North Regions, and limited presence in peripheral zones. These insights provide an evidence base to support urban land use planning, zoning, and policy decisions aligned with Singaporeans’ lifestyle needs and equitable service distribution.
+This report examines the spatial and temporal patterns of four lifestyle-related business sectors in Singapore—fitness centres, retail clothing, restaurants and cafés, and event/concert organisers—using ACRA registration data from January 2024 to June 2025. The data was cleaned, geocoded with OneMap, and analysed within Master Plan 2019 subzone boundaries. Methods included choropleth mapping, Kernel Density Estimation (KDE), and spatio-temporal point pattern analysis implemented in R. The results reveal concentrated clusters of restaurants and retail in central hubs, dispersed but residential-led fitness facilities, and event organisers located near major venues. These patterns highlight both hotspots and underserved areas, providing evidence to guide zoning, facility provision, and urban planning strategies that balance vibrancy, equity, and resilience in Singapore’s compact cityscape.
 
 # 1 Loading the R packages
 
@@ -32,10 +32,13 @@ spatstat – Comprehensive spatial point pattern analysis: create ppp objects, e
 
 rvest – Web scraping made easy: download HTML pages and extract elements, text, and tables with css/xpath selectors.
 
+sparr - Spatial and spatio-temporal relative risk: estimate and compare densities between groups of point events, construct relative risk surfaces, and perform hypothesis testing for spatial clustering.
+
+stpp - Spatio-temporal point pattern analysis: analyse events distributed in both space and time, providing tools for second-order characteristics, spatio-temporal K-functions, and kernel intensity estimation.
+
 ```{r}
-pacman::p_load(tidyverse, sf, tmap, httr, 
-               dplyr, ggplot2, patchwork, 
-               terra, spatstat, rvest)
+pacman::p_load(tidyverse, sf, tmap, httr, dplyr, ggplot2, 
+               patchwork, terra, spatstat, rvest, sparr, stpp)
 ```
 
 
@@ -294,7 +297,7 @@ biz_56111_sf <- st_as_sf(biz_56111,
                          crs = 3414)
 ```
 
-###Event/Concert Organisers
+### Event/Concert Organisers
 
 ```{r}
 #Geocoding
@@ -754,7 +757,113 @@ Since observed functions consistently deviate from the theoretical Poisson distr
 
 #### 4.2.1.2 Spatio-Temporal Point Patterns Analysis
 
+```{r}
+# Make geometries valid and align CRS
+biz_93111_sf <- st_make_valid(biz_93111_sf)
+mpsz_cl      <- st_make_valid(mpsz_cl)
 
+if (st_crs(biz_93111_sf) != st_crs(mpsz_cl)) {
+  biz_93111_sf <- st_transform(biz_93111_sf, st_crs(mpsz_cl))
+}
+
+# Central Region polygons
+mpsz_cr <- mpsz_cl %>%
+  filter(grepl("^central\\s*region$", REGION_N, ignore.case = TRUE))
+
+stopifnot(nrow(mpsz_cr) > 0)   # sanity check
+
+# Points that intersect Central Region
+biz_93111_cr <- biz_93111_sf %>%
+  st_join(mpsz_cr %>% select(REGION_N), join = st_intersects, left = FALSE)
+
+if (nrow(biz_93111_cr) == 0) {
+  biz_93111_cr <- biz_93111_sf %>%
+    st_buffer(0.5) %>%                                    # ~0.5 m in EPSG:3414
+    st_join(mpsz_cr %>% select(REGION_N),
+            join = st_intersects, left = FALSE)
+}
+
+stopifnot(nrow(biz_93111_cr) > 0)   # prevent sfc[[1]] error
+
+# Filter to Jan 2024 – Jun 2025 and build Year-Month facet
+biz_93111_cr <- biz_93111_cr %>%
+  filter(date >= as.Date("2024-01-01") & date <= as.Date("2025-06-30")) %>%
+  mutate(YearMonth = format(date, "%b %Y"),
+         YearMonth = factor(YearMonth,
+                            levels = format(seq(as.Date("2024-01-01"),
+                                                as.Date("2025-06-01"),
+                                                by = "1 month"), "%b %Y"),
+                            ordered = TRUE))
+
+# Plot
+tmap_mode("plot")
+
+tm_shape(mpsz_cr) +
+  tm_polygons(fill = "grey90") +
+  tm_borders(col = "grey60") +
+tm_shape(biz_93111_cr) +
+  tm_dots(size = 0.06) +
+tm_facets(by = "YearMonth", ncol = 6, nrow = 3, free.coords = FALSE, drop.units = TRUE) +
+tm_title("Fitness centres and gymnasiums in Central Region by Month")
+```
+
+The faceted map shows the monthly distribution of new fitness centres and gymnasiums registered in Singapore’s Central Region from January 2024 to June 2025. Registrations were sparse in early 2024 but began to rise notably from mid-2024, peaking between July and October, before stabilising into 2025. 
+
+Spatially, most businesses are clustered in core areas, reflecting the concentration of office workers, residents, and lifestyle demand. Outer subzones saw fewer new establishments, highlighting the urban-centric growth of the sector. 
+
+##### STKDE by Month
+
+```{r}
+months_seq <- seq(as.Date("2024-01-01"), as.Date("2025-06-01"), by = "1 month")
+labels_ym  <- format(months_seq, "%b %Y")
+
+biz_93111_cr_18 <- biz_93111_cr %>%
+  filter(date >= as.Date("2024-01-01"), date <= as.Date("2025-06-30")) %>%
+  mutate(t_index = match(format(date, "%Y-%m"), format(months_seq, "%Y-%m"))) %>%
+  filter(!is.na(t_index)) %>%
+  select(t_index) 
+
+cr93111_ppp  <- as.ppp(biz_93111_cr_18) %>% 
+  rjitter(retry = TRUE, nsim = 1, drop = TRUE)
+
+cr_owin  <- as.owin(mpsz_cr)
+cr93111_ppp_owin <- cr93111_ppp[cr_owin]
+
+set.seed(1234)
+BOOT.spattemp(cr93111_ppp_owin) 
+```
+
+```{r fig.width=14, fig.height=7}
+cr93111_kde <- spattemp.density(cr93111_ppp_owin,
+                             h = 700,
+                             lambda = 7)
+
+par(mfcol = c(3, 6), mar = c(2,2,2,4))
+for(i in 1:18){
+  plot(cr93111_kde, i,
+       override.par = FALSE, fix.range = TRUE,
+       main = labels_ym[i])
+}
+```
+
+The spatio-temporal KDE of fitness centres and gymnasiums in the Central Region from January 2024 to June 2025 reveals persistent clustering around the downtown core. These hotspots remain stable across months, reflecting strong demand driven by Singaporeans’ lifestyle preferences for fitness facilities near workplaces, shopping districts, and residential hubs. Peripheral areas of the Central Region show relatively low density throughout, indicating that the market remains concentrated in high-traffic, commercially vibrant subzones. The consistency of these clusters highlights entrenched urban patterns where health and lifestyle services thrive in centralised locations.
+
+##### K-function
+
+```{r}
+cr93111_coords <- st_coordinates(biz_93111_cr)
+
+cr93111_df <- data.frame(
+  x = cr93111_coords[, 1],  
+  y = cr93111_coords[, 2],
+  t = biz_93111_cr$`date`)
+
+cr93111_stpp <- as.3dpoints(cr93111_df)
+cr93111_stik <- STIKhat(cr93111_stpp)
+
+plotK(cr93111_stik)
+```
+The plot shows high contour values at short spatial and temporal distances, indicating strong clustering of fitness centres and gymnasiums close together in both space and time. As distance and time increase, the contours flatten, suggesting weaker clustering or more random patterns. This means new establishments tend to open near existing ones within similar time periods, reflecting demand-driven clustering in central hotspots.
 
 
 # 5 Analysis of Retail sale of clothing for adults
@@ -1034,6 +1143,116 @@ Together, these results strongly reject the null hypothesis, showing that the di
 
 #### 5.2.1.2 Spatio-Temporal Point Patterns Analysis
 
+```{r}
+# Make geometries valid and align CRS
+biz_47711_sf <- st_make_valid(biz_47711_sf)
+mpsz_cl      <- st_make_valid(mpsz_cl)
+
+if (st_crs(biz_47711_sf) != st_crs(mpsz_cl)) {
+  biz_47711_sf <- st_transform(biz_47711_sf, st_crs(mpsz_cl))
+}
+
+# Central Region polygons
+mpsz_cr <- mpsz_cl %>%
+  filter(grepl("^central\\s*region$", REGION_N, ignore.case = TRUE))
+
+stopifnot(nrow(mpsz_cr) > 0)   # sanity check
+
+# Points that intersect Central Region
+biz_47711_cr <- biz_47711_sf %>%
+  st_join(mpsz_cr %>% select(REGION_N), join = st_intersects, left = FALSE)
+
+if (nrow(biz_47711_cr) == 0) {
+  biz_47711_cr <- biz_47711_sf %>%
+    st_buffer(0.5) %>%                                    # ~0.5 m in EPSG:3414
+    st_join(mpsz_cr %>% select(REGION_N),
+            join = st_intersects, left = FALSE)
+}
+
+stopifnot(nrow(biz_47711_cr) > 0)   # prevent sfc[[1]] error
+
+# Filter to Jan 2024 – Jun 2025 and build Year-Month facet
+biz_47711_cr <- biz_47711_cr %>%
+  filter(date >= as.Date("2024-01-01") & date <= as.Date("2025-06-30")) %>%
+  mutate(YearMonth = format(date, "%b %Y"),
+         YearMonth = factor(YearMonth,
+                            levels = format(seq(as.Date("2024-01-01"),
+                                                as.Date("2025-06-01"),
+                                                by = "1 month"), "%b %Y"),
+                            ordered = TRUE))
+
+# Plot
+tmap_mode("plot")
+
+tm_shape(mpsz_cr) +
+  tm_polygons(fill = "grey90") +
+  tm_borders(col = "grey60") +
+tm_shape(biz_47711_cr) +
+  tm_dots(size = 0.06) +
+tm_facets(by = "YearMonth", ncol = 6, nrow = 3, free.coords = FALSE, drop.units = TRUE) +
+tm_title("Retail sale of clothing for adults in Central Region by Month")
+```
+The plot illustrates the monthly distribution of retail clothing businesses from January 2024 to June 2025 in the Central Region. The pattern shows consistent clustering of new business registrations across the months, with noticeable concentrations in the core urban zones. 
+
+While the density varies slightly month to month, the general trend highlights sustained growth and stability in demand for adult clothing retail outlets. Peaks appear in certain months, such as March, September, and early 2025, suggesting seasonal or fashion-driven cycles that influence registrations. The relatively even spread across the Central Region indicates the area remains an attractive hub for retail business activity.
+
+Overall, the data suggests stable but strategically concentrated growth in adult clothing retail businesses.
+
+##### STKDE by Month
+
+```{r}
+months_seq <- seq(as.Date("2024-01-01"), as.Date("2025-06-01"), by = "1 month")
+labels_ym  <- format(months_seq, "%b %Y")
+
+biz_47711_cr_18 <- biz_47711_cr %>%
+  filter(date >= as.Date("2024-01-01"), date <= as.Date("2025-06-30")) %>%
+  mutate(t_index = match(format(date, "%Y-%m"), format(months_seq, "%Y-%m"))) %>%
+  filter(!is.na(t_index)) %>%
+  select(t_index) 
+
+cr47711_ppp  <- as.ppp(biz_47711_cr_18) %>% 
+  rjitter(retry = TRUE, nsim = 1, drop = TRUE)
+
+cr_owin  <- as.owin(mpsz_cr)
+cr47711_ppp_owin <- cr47711_ppp[cr_owin]
+
+set.seed(1234)
+BOOT.spattemp(cr47711_ppp_owin) 
+```
+
+```{r fig.width=14, fig.height=7}
+cr47711_kde <- spattemp.density(cr47711_ppp_owin,
+                             h = 770,
+                             lambda = 6.15)
+
+par(mfcol = c(3, 6), mar = c(2,2,2,4))
+for(i in 1:18){
+  plot(cr47711_kde, i,
+       override.par = FALSE, fix.range = TRUE,
+       main = labels_ym[i])
+}
+```
+
+The spatio-temporal KDE of retail clothing businesses (Jan 2024–Jun 2025) shows persistent clustering in the Central Region, with stable hotspots in major commercial hubs. Clustering intensity peaks in mid-2024 and early 2025, likely tied to festive seasons and fashion cycles. While businesses spread across multiple subzones, central districts remain the most attractive for new entrants, reflecting their dominance as high-traffic retail nodes. Month-to-month variations are modest, indicating steady activity without sharp declines. Overall, the results highlight retail clothing’s resilience, with consistent growth driven by consumer demand, reinforcing its role as a core element of Singapore’s lifestyle economy.
+
+##### K-function
+
+```{r}
+cr47711_coords <- st_coordinates(biz_47711_cr)
+
+cr47711_df <- data.frame(
+  x = cr47711_coords[, 1],  
+  y = cr47711_coords[, 2],
+  t = biz_47711_cr$`date`)
+
+cr47711_stpp <- as.3dpoints(cr47711_df)
+cr47711_stik <- STIKhat(cr47711_stpp)
+
+plotK(cr47711_stik)
+```
+
+The plot shows strong clustering of events at short spatial and temporal distances, meaning activities occur close together in both space and time. As distance and time increase, clustering weakens and distribution becomes more dispersed. This indicates businesses or events tend to concentrate locally within shorter periods, rather than being randomly spread across space and time.
+
 ### 5.2.2 East Region Second-order Spatial Point Patterns Analysis
 
 #### 5.2.2.1 Second-order Spatial Point Patterns Analysis 
@@ -1130,8 +1349,114 @@ Together, these functions reveal that retail clothing outlets in the East Region
 
 #### 5.2.2.2 Spatio-Temporal Point Patterns Analysis
 
+```{r}
+# Make geometries valid and align CRS
+biz_47711_sf <- st_make_valid(biz_47711_sf)
+mpsz_cl      <- st_make_valid(mpsz_cl)
 
+if (st_crs(biz_47711_sf) != st_crs(mpsz_cl)) {
+  biz_47711_sf <- st_transform(biz_47711_sf, st_crs(mpsz_cl))
+}
 
+# Central Region polygons
+mpsz_er <- mpsz_cl %>%
+  filter(grepl("^east\\s*region$", REGION_N, ignore.case = TRUE))
+
+stopifnot(nrow(mpsz_er) > 0)   # sanity check
+
+# Points that intersect Central Region
+biz_47711_er <- biz_47711_sf %>%
+  st_join(mpsz_er %>% select(REGION_N), join = st_intersects, left = FALSE)
+
+if (nrow(biz_47711_er) == 0) {
+  biz_47711_er <- biz_47711_sf %>%
+    st_buffer(0.5) %>%                                    # ~0.5 m in EPSG:3414
+    st_join(mpsz_er %>% select(REGION_N),
+            join = st_intersects, left = FALSE)
+}
+
+stopifnot(nrow(biz_47711_er) > 0)   # prevent sfc[[1]] error
+
+# Filter to Jan 2024 – Jun 2025 and build Year-Month facet
+biz_47711_er <- biz_47711_er %>%
+  filter(date >= as.Date("2024-01-01") & date <= as.Date("2025-06-30")) %>%
+  mutate(YearMonth = format(date, "%b %Y"),
+         YearMonth = factor(YearMonth,
+                            levels = format(seq(as.Date("2024-01-01"),
+                                                as.Date("2025-06-01"),
+                                                by = "1 month"), "%b %Y"),
+                            ordered = TRUE))
+
+# Plot
+tmap_mode("plot")
+
+tm_shape(mpsz_er) +
+  tm_polygons(fill = "grey90") +
+  tm_borders(col = "grey60") +
+tm_shape(biz_47711_er) +
+  tm_dots(size = 0.06) +
+tm_facets(by = "YearMonth", ncol = 6, nrow = 3, free.coords = FALSE, drop.units = TRUE) +
+tm_title("Retail sale of clothing for adults in East Region by Month")
+```
+
+The monthly distribution of retail clothing businesses in the East Region (Jan 2024–Jun 2025) shows steady registrations with moderate clustering in select subzones. Peaks appear in early 2024 and early 2025, likely linked to seasonal demand or market shifts. While businesses are spread across the region, growth is uneven, with certain subzones consistently attracting more establishments. 
+
+This localized clustering suggests expansion is concentrated in established commercial areas with strong consumer traffic, rather than evenly across the region. The pattern reflects retailers’ preference for competitive yet high-demand environments, ensuring visibility and accessibility while limiting over-dispersion.
+
+##### STKDE by Month
+
+```{r}
+months_seq <- seq(as.Date("2024-01-01"), as.Date("2025-06-01"), by = "1 month")
+labels_ym  <- format(months_seq, "%b %Y")
+
+biz_47711_er_18 <- biz_47711_er %>%
+  filter(date >= as.Date("2024-01-01"), date <= as.Date("2025-06-30")) %>%
+  mutate(t_index = match(format(date, "%Y-%m"), format(months_seq, "%Y-%m"))) %>%
+  filter(!is.na(t_index)) %>%
+  select(t_index) 
+
+er47711_ppp  <- as.ppp(biz_47711_er_18) %>% 
+  rjitter(retry = TRUE, nsim = 1, drop = TRUE)
+
+er_owin  <- as.owin(mpsz_er)
+er47711_ppp_owin <- er47711_ppp[er_owin]
+
+set.seed(1234)
+BOOT.spattemp(er47711_ppp_owin) 
+```
+
+```{r fig.width=14, fig.height=7}
+er47711_kde <- spattemp.density(er47711_ppp_owin,
+                             h = 1020,
+                             lambda = 6.33)
+
+par(mfcol = c(3, 6), mar = c(2,2,2,4))
+for(i in 1:18){
+  plot(er47711_kde, i,
+       override.par = FALSE, fix.range = TRUE,
+       main = labels_ym[i])
+}
+```
+
+The spatio-temporal KDE of retail clothing businesses in the East Region from January 2024 to June 2025 highlights consistent clustering around key commercial zones. The density plots show strong and stable hotspots across most months. This suggests steady growth in consumer-oriented retail activity, likely reflecting rising demand in established shopping and residential hubs. While the spread of businesses remains relatively concentrated, the intensity of clustering fluctuates slightly, with occasional expansion toward peripheral areas during peak months. 
+
+##### K-function
+
+```{r}
+er47711_coords <- st_coordinates(biz_47711_er)
+
+er47711_df <- data.frame(
+  x = er47711_coords[, 1],  
+  y = er47711_coords[, 2],
+  t = biz_47711_er$`date`)
+
+er47711_stpp <- as.3dpoints(er47711_df)
+er47711_stik <- STIKhat(er47711_stpp)
+
+plotK(er47711_stik)
+```
+
+The plot shows strong clustering of retail clothing businesses at short spatial and temporal distances, meaning new outlets often emerge near existing ones within similar timeframes. As distance increases, clustering weakens and patterns become more dispersed, indicating localized rather than widespread expansion.
 
 ### 5.2.3 North Region Second-order Spatial Point Patterns Analysis
 
@@ -1227,7 +1552,120 @@ Since observed patterns fall outside the simulation envelope, the null hypothesi
 
 #### 5.2.3.2 Spatio-Temporal Point Patterns Analysis
 
+```{r}
+# Make geometries valid and align CRS
+biz_47711_sf <- st_make_valid(biz_47711_sf)
+mpsz_cl      <- st_make_valid(mpsz_cl)
 
+if (st_crs(biz_47711_sf) != st_crs(mpsz_cl)) {
+  biz_47711_sf <- st_transform(biz_47711_sf, st_crs(mpsz_cl))
+}
+
+# Central Region polygons
+mpsz_nr <- mpsz_cl %>%
+  filter(grepl("^north\\s*region$", REGION_N, ignore.case = TRUE))
+
+stopifnot(nrow(mpsz_nr) > 0)   # sanity check
+
+# Points that intersect Central Region
+biz_47711_nr <- biz_47711_sf %>%
+  st_join(mpsz_nr %>% select(REGION_N), join = st_intersects, left = FALSE)
+
+if (nrow(biz_47711_nr) == 0) {
+  biz_47711_nr <- biz_47711_sf %>%
+    st_buffer(0.5) %>%                                    # ~0.5 m in EPSG:3414
+    st_join(mpsz_nr %>% select(REGION_N),
+            join = st_intersects, left = FALSE)
+}
+
+stopifnot(nrow(biz_47711_nr) > 0)   # prevent sfc[[1]] error
+
+# Filter to Jan 2024 – Jun 2025 and build Year-Month facet
+biz_47711_nr <- biz_47711_nr %>%
+  filter(date >= as.Date("2024-01-01") & date <= as.Date("2025-06-30")) %>%
+  mutate(YearMonth = format(date, "%b %Y"),
+         YearMonth = factor(YearMonth,
+                            levels = format(seq(as.Date("2024-01-01"),
+                                                as.Date("2025-06-01"),
+                                                by = "1 month"), "%b %Y"),
+                            ordered = TRUE))
+
+# Plot
+tmap_mode("plot")
+
+tm_shape(mpsz_nr) +
+  tm_polygons(fill = "grey90") +
+  tm_borders(col = "grey60") +
+tm_shape(biz_47711_nr) +
+  tm_dots(size = 0.06) +
+tm_facets(by = "YearMonth", ncol = 6, nrow = 3, free.coords = FALSE, drop.units = TRUE) +
+tm_title("Retail sale of clothing for adults in North Region by Month")
+```
+
+The plot illustrates the monthly distribution of retail clothing businesses in the North Region from January 2024 to June 2025. Overall, the number of new establishments appears modest compared to other regions, with businesses showing a relatively even but limited spread across subzones. 
+
+Most months show consistent but small clusters, suggesting that clothing retail growth in this region is gradual and less concentrated. There is no sharp seasonal spike, but slight increases are visible in the first half of 2024 and early 2025, reflecting moderate expansion phases. The persistence of activity across months indicates steady consumer demand, but the lower density highlights that this region remains a secondary market for clothing retailers compared to more central areas. 
+
+This pattern aligns with slower-paced development and suburban consumer dynamics, where retail activity is present but less intensive. Overall, the trend suggests stable yet modest growth in clothing retail throughout the period.
+
+##### STKDE by Month
+
+```{r}
+months_seq <- seq(as.Date("2024-01-01"), as.Date("2025-06-01"), by = "1 month")
+labels_ym  <- format(months_seq, "%b %Y")
+
+biz_47711_nr_18 <- biz_47711_nr %>%
+  filter(date >= as.Date("2024-01-01"), date <= as.Date("2025-06-30")) %>%
+  mutate(t_index = match(format(date, "%Y-%m"), format(months_seq, "%Y-%m"))) %>%
+  filter(!is.na(t_index)) %>%
+  select(t_index) 
+
+nr47711_ppp  <- as.ppp(biz_47711_nr_18) %>% 
+  rjitter(retry = TRUE, nsim = 1, drop = TRUE)
+
+nr_owin  <- as.owin(mpsz_nr)
+nr47711_ppp_owin <- nr47711_ppp[nr_owin]
+
+set.seed(1234)
+BOOT.spattemp(nr47711_ppp_owin) 
+```
+
+```{r fig.width=14, fig.height=7}
+nr47711_kde <- spattemp.density(nr47711_ppp_owin,
+                             h = 835,
+                             lambda = 6.34)
+
+par(mfcol = c(3, 6), mar = c(2,2,2,4))
+for(i in 1:18){
+  plot(nr47711_kde, i,
+       override.par = FALSE, fix.range = TRUE,
+       main = labels_ym[i])
+}
+```
+
+The Spatio-temporal KDE of retail clothing businesses in the North Region from January 2024 to June 2025 highlights modest but steady activity. The heatmaps show consistent clustering in a few concentrated areas. 
+
+Unlike regions with widespread or dense clusters, the North shows fewer high-density zones, reflecting a slower pace of retail expansion. The spatial concentration remains relatively stable, suggesting businesses tend to locate near existing clusters rather than dispersing widely. Temporally, the patterns indicate steady demand with occasional peaks but no sharp seasonal surges. 
+
+Overall, the analysis reveals that while the North Region supports a steady retail clothing market, growth is modest and localized, reinforcing its role as a smaller but stable contributor to the broader retail landscape.
+
+##### K-function
+
+```{r}
+nr47711_coords <- st_coordinates(biz_47711_nr)
+
+nr47711_df <- data.frame(
+  x = nr47711_coords[, 1],  
+  y = nr47711_coords[, 2],
+  t = biz_47711_nr$`date`)
+
+nr47711_stpp <- as.3dpoints(nr47711_df)
+nr47711_stik <- STIKhat(nr47711_stpp)
+
+plotK(nr47711_stik)
+```
+
+The plot shows strong clustering of retail clothing outlets at short spatial and temporal distances, meaning new shops often open near existing ones within similar timeframes. As distance and time increase, clustering weakens, indicating more dispersed distribution across the region.
 
 
 # 6 Analysis of Restaurants and Cafés
@@ -1363,9 +1801,7 @@ tm_shape(kde_56111_bw_terra) +
             scale = 1.0)
 ```
 
-The KDE map of restaurants and cafés shows strong clustering in Singapore. The most intense hotspot is found in the central-southern region, highlighting high concentrations around lifestyle, entertainment, and business hubs. Additional clusters are visible in the eastern region and parts of the north, reflecting dining activity in regional centres and densely populated areas. In contrast, the western and peripheral areas show lower density, indicating fewer establishments and more limited accessibility in those zones.
-
-Overall, restaurants and cafés are unevenly distributed, with clear concentration in city and regional centres where demand is highest. This reflects urban lifestyle patterns, where food and beverage outlets thrive in commercial cores, transport nodes, and densely populated neighbourhoods. At the same time, the low densities in outlying areas suggest opportunities for further development to enhance dining accessibility in suburban and peripheral zones.
+The KDE map of restaurants and cafés highlights strong clustering in Singapore, with the densest hotspot in the central-southern region around lifestyle, entertainment, and business hubs. Secondary clusters appear in the east and north, reflecting dining demand in regional centres and dense residential areas. By contrast, the west and peripheral zones show much lower density, indicating limited accessibility. Overall, the distribution is uneven, concentrated in city cores and transit-linked hubs where demand is highest.
 
 ## 6.2 Regional analysis - Central Region
 
@@ -1477,6 +1913,117 @@ The K-function increases far above the theoretical expectation, showing that the
 Similarly, the L-function remains well above the Poisson baseline across multiple scales, reinforcing strong aggregation rather than dispersion.
 
 Together, these functions consistently demonstrate that Restaurants and Cafés in the Central Region are highly clustered, concentrated around commercial hubs and lifestyle districts, and the observed distribution clearly deviates from randomness.
+
+#### 6.2.1.2 Spatio-Temporal Point Patterns Analysis
+
+```{r}
+# Make geometries valid and align CRS
+biz_56111_sf <- st_make_valid(biz_56111_sf)
+mpsz_cl      <- st_make_valid(mpsz_cl)
+
+if (st_crs(biz_56111_sf) != st_crs(mpsz_cl)) {
+  biz_56111_sf <- st_transform(biz_56111_sf, st_crs(mpsz_cl))
+}
+
+# Central Region polygons
+mpsz_cr <- mpsz_cl %>%
+  filter(grepl("^central\\s*region$", REGION_N, ignore.case = TRUE))
+
+stopifnot(nrow(mpsz_cr) > 0)   # sanity check
+
+# Points that intersect Central Region
+biz_56111_cr <- biz_56111_sf %>%
+  st_join(mpsz_cr %>% select(REGION_N), join = st_intersects, left = FALSE)
+
+if (nrow(biz_56111_cr) == 0) {
+  biz_56111_cr <- biz_56111_sf %>%
+    st_buffer(0.5) %>%                                    # ~0.5 m in EPSG:3414
+    st_join(mpsz_cr %>% select(REGION_N),
+            join = st_intersects, left = FALSE)
+}
+
+stopifnot(nrow(biz_56111_cr) > 0)   # prevent sfc[[1]] error
+
+# Filter to Jan 2024 – Jun 2025 and build Year-Month facet
+biz_56111_cr <- biz_56111_cr %>%
+  filter(date >= as.Date("2024-01-01") & date <= as.Date("2025-06-30")) %>%
+  mutate(YearMonth = format(date, "%b %Y"),
+         YearMonth = factor(YearMonth,
+                            levels = format(seq(as.Date("2024-01-01"),
+                                                as.Date("2025-06-01"),
+                                                by = "1 month"), "%b %Y"),
+                            ordered = TRUE))
+
+# Plot
+tmap_mode("plot")
+
+tm_shape(mpsz_cr) +
+  tm_polygons(fill = "grey90") +
+  tm_borders(col = "grey60") +
+tm_shape(biz_56111_cr) +
+  tm_dots(size = 0.06) +
+tm_facets(by = "YearMonth", ncol = 6, nrow = 3, free.coords = FALSE, drop.units = TRUE) +
+tm_title("Restaurants and Cafés in Central Region by Month")
+```
+
+The spatio-temporal distribution of Restaurants and Cafés in Singapore’s Central Region from January 2024 to June 2025 shows clear clustering in urban hotspots such as the Downtown Core and surrounding commercial districts.
+
+Throughout the months, the majority of new establishments consistently concentrate in these central lifestyle and business hubs, highlighting the role of high foot traffic, office workers, and tourist activity in driving demand. The density of points increases steadily in mid-2024 and remains strong into early 2025, reflecting sustained growth in the food and beverage sector. Peripheral subzones show fewer establishments, reinforcing the dominance of central areas as the preferred locations for business ventures. 
+
+##### STKDE by Month
+
+```{r}
+months_seq <- seq(as.Date("2024-01-01"), as.Date("2025-06-01"), by = "1 month")
+labels_ym  <- format(months_seq, "%b %Y")
+
+biz_56111_cr_18 <- biz_56111_cr %>%
+  filter(date >= as.Date("2024-01-01"), date <= as.Date("2025-06-30")) %>%
+  mutate(t_index = match(format(date, "%Y-%m"), format(months_seq, "%Y-%m"))) %>%
+  filter(!is.na(t_index)) %>%
+  select(t_index) 
+
+cr56111_ppp  <- as.ppp(biz_56111_cr_18) %>% 
+  rjitter(retry = TRUE, nsim = 1, drop = TRUE)
+
+cr_owin  <- as.owin(mpsz_cr)
+cr56111_ppp_owin <- cr56111_ppp[cr_owin]
+
+set.seed(1234)
+BOOT.spattemp(cr56111_ppp_owin) 
+```
+```{r fig.width=14, fig.height=7}
+cr56111_kde <- spattemp.density(cr56111_ppp_owin,
+                             h = 430,
+                             lambda = 5.1)
+
+par(mfcol = c(3, 6), mar = c(2,2,2,4))
+for(i in 1:18){
+  plot(cr56111_kde, i,
+       override.par = FALSE, fix.range = TRUE,
+       main = labels_ym[i])
+}
+```
+
+The spatio-temporal KDE of Restaurants and Cafés in the Central Region (Jan 2024–Jun 2025) shows persistent clustering in urban hubs, driven by demand from office workers, tourists, and residents. Hotspots intensified in mid-to-late 2024, reflecting expansion in the food and beverage sector, before stabilising in 2025. Peripheral subzones saw little growth, underscoring a strong preference for high-footfall central locations. Overall, restaurants and cafés consistently open near existing clusters, reinforcing centralisation and competition. Temporal surges reflect favourable business cycles, highlighting how demand-driven expansion continues to shape Singapore’s urban dining landscape while leaving suburban areas relatively underserved.
+
+##### K-function
+
+```{r}
+cr56111_coords <- st_coordinates(biz_56111_cr)
+
+cr56111_df <- data.frame(
+  x = cr56111_coords[, 1],  
+  y = cr56111_coords[, 2],
+  t = biz_56111_cr$`date`)
+
+cr56111_stpp <- as.3dpoints(cr56111_df)
+cr56111_stik <- STIKhat(cr56111_stpp)
+
+plotK(cr56111_stik)
+```
+
+The plot shows high contour values at short spatial and temporal distances, indicating strong clustering of restaurants and cafés close together in both space and time. As distance and time increase, the contours flatten, suggesting weaker clustering or more random patterns. This means establishments tend to open near existing ones within similar periods, reinforcing central hotspots as key business clusters.
+
 
 # 7 Analysis of Event/Concert Organisers
 
@@ -1613,7 +2160,7 @@ tm_shape(kde_82303_bw_terra) +
 
 The KDE map of event and concert organisers shows a clustered but more dispersed pattern across Singapore. The most intense hotspot is located in the central-southern region, reflecting the presence of major entertainment venues, convention centres, and business districts. Additional moderate clusters can be observed in the eastern and northern areas, suggesting smaller hubs of activity where regional facilities or community venues support event services. In contrast, the western areas show relatively low density, indicating fewer organisers and limited coverage in those zones.
 
-Overall, event and concert organisers are unevenly distributed, with clear concentration in city centres where large-scale events and performances are most viable. The presence of smaller clusters across other regions indicates secondary hubs of activity, but many suburban and peripheral areas remain underrepresented. This reflects the dependence of the events industry on centralised venues and transport accessibility, while also highlighting opportunities for decentralised growth.
+Overall, event and concert organisers are unevenly distributed, with clear concentration in city centres where large-scale events and performances are most viable. The presence of smaller clusters across other regions indicates secondary hubs of activity, but many suburban and peripheral areas remain underrepresented. 
 
 ## 7.2 Regional analysis - Central Region
 
@@ -1629,11 +2176,12 @@ biz82303_cr_ppp.km = rescale.ppp(biz82303_cr_ppp, 1000, "km")
 plot(unmark(biz82303_cr_ppp.km), 
   main="Event/Concert Organisers in Central Region")
 ```
+
 The map shows the distribution of event and concert organisers in the Central Region, with notable clustering in key subzones such as Geylang East, Kampong Ubi, and Cecil. These areas act as hubs for entertainment and cultural activities, while other subzones show a more dispersed pattern.
 
 ### 7.2.1 Central Region Second-order Spatial Point Patterns Analysis
 
-#### 4.2.1.1 Second-order Spatial Point Patterns Analysis 
+#### 7.2.1.1 Second-order Spatial Point Patterns Analysis 
 
 ##### Function estimation 
 
@@ -1715,22 +2263,135 @@ Similarly, the L-function is well above the baseline, especially between 500 and
 
 Since the observed functions deviate significantly from the theoretical random distribution and fall outside the simulation envelope, the results demonstrate strong spatial clustering. Therefore, the null hypothesis is rejected.
 
+#### 7.2.1.2 Spatio-Temporal Point Patterns Analysis
+
+```{r}
+# Make geometries valid and align CRS
+biz_82303_sf <- st_make_valid(biz_82303_sf)
+mpsz_cl      <- st_make_valid(mpsz_cl)
+
+if (st_crs(biz_82303_sf) != st_crs(mpsz_cl)) {
+  biz_82303_sf <- st_transform(biz_82303_sf, st_crs(mpsz_cl))
+}
+
+# Central Region polygons
+mpsz_cr <- mpsz_cl %>%
+  filter(grepl("^central\\s*region$", REGION_N, ignore.case = TRUE))
+
+stopifnot(nrow(mpsz_cr) > 0)   # sanity check
+
+# Points that intersect Central Region
+biz_82303_cr <- biz_82303_sf %>%
+  st_join(mpsz_cr %>% select(REGION_N), join = st_intersects, left = FALSE)
+
+if (nrow(biz_82303_cr) == 0) {
+  biz_82303_cr <- biz_82303_sf %>%
+    st_buffer(0.5) %>%                                    # ~0.5 m in EPSG:3414
+    st_join(mpsz_cr %>% select(REGION_N),
+            join = st_intersects, left = FALSE)
+}
+
+stopifnot(nrow(biz_82303_cr) > 0)   # prevent sfc[[1]] error
+
+# Filter to Jan 2024 – Jun 2025 and build Year-Month facet
+biz_82303_cr <- biz_82303_cr %>%
+  filter(date >= as.Date("2024-01-01") & date <= as.Date("2025-06-30")) %>%
+  mutate(YearMonth = format(date, "%b %Y"),
+         YearMonth = factor(YearMonth,
+                            levels = format(seq(as.Date("2024-01-01"),
+                                                as.Date("2025-06-01"),
+                                                by = "1 month"), "%b %Y"),
+                            ordered = TRUE))
+
+# Plot
+tmap_mode("plot")
+
+tm_shape(mpsz_cr) +
+  tm_polygons(fill = "grey90") +
+  tm_borders(col = "grey60") +
+tm_shape(biz_82303_cr) +
+  tm_dots(size = 0.06) +
+tm_facets(by = "YearMonth", ncol = 6, nrow = 3, free.coords = FALSE, drop.units = TRUE) +
+tm_title("Event/Concert Organisers in Central Region by Month")
+```
+
+The spatio-temporal distribution of event and concert organisers in Singapore’s Central Region (Jan 2024–Jun 2025) shows persistent clustering in central subzones, driven by demand for accessible, high-activity areas. Activity intensifies slightly in mid-2024 and early 2025, likely reflecting seasonal peaks, but overall patterns remain stable. Peripheral areas see minimal growth, indicating that businesses prefer established clusters with strong infrastructure and audiences, reinforcing the Central Region as the core hub for event-related activities.
+
+##### STKDE by Month
+
+```{r}
+months_seq <- seq(as.Date("2024-01-01"), as.Date("2025-06-01"), by = "1 month")
+labels_ym  <- format(months_seq, "%b %Y")
+
+biz_82303_cr_18 <- biz_82303_cr %>%
+  filter(date >= as.Date("2024-01-01"), date <= as.Date("2025-06-30")) %>%
+  mutate(t_index = match(format(date, "%Y-%m"), format(months_seq, "%Y-%m"))) %>%
+  filter(!is.na(t_index)) %>%
+  select(t_index) 
+
+cr82303_ppp  <- as.ppp(biz_82303_cr_18) %>% 
+  rjitter(retry = TRUE, nsim = 1, drop = TRUE)
+
+cr_owin  <- as.owin(mpsz_cr)
+cr82303_ppp_owin <- cr82303_ppp[cr_owin]
+
+set.seed(1234)
+BOOT.spattemp(cr82303_ppp_owin) 
+```
+
+```{r fig.width=14, fig.height=7}
+cr82303_kde <- spattemp.density(cr82303_ppp_owin,
+                             h = 700,
+                             lambda = 6)
+
+par(mfcol = c(3, 6), mar = c(2,2,2,4))
+for(i in 1:18){
+  plot(cr82303_kde, i,
+       override.par = FALSE, fix.range = TRUE,
+       main = labels_ym[i])
+}
+```
+
+The spatio-temporal KDE of event and concert organisers (Jan 2024–Jun 2025) reveals persistent clustering in central subzones, with hotspots consistently stable across months. High-density activity intensifies in mid-2024 and early 2025, likely linked to seasonal peaks in event demand. Despite minor monthly variations, the pattern shows limited dispersion, as organisers concentrate in established zones with strong infrastructure and audience access. Peripheral areas remain largely inactive, underscoring a centralised growth trend. Overall, the KDE highlights how central subzones dominate the sector, with new businesses reinforcing existing hotspots and sustaining Singapore’s core event and entertainment hubs.
+
+##### K-function
+
+```{r}
+cr82303_coords <- st_coordinates(biz_82303_cr)
+
+cr82303_df <- data.frame(
+  x = cr82303_coords[, 1],  
+  y = cr82303_coords[, 2],
+  t = biz_82303_cr$`date`)
+
+cr82303_stpp <- as.3dpoints(cr82303_df)
+cr82303_stik <- STIKhat(cr82303_stpp)
+
+plotK(cr82303_stik)
+```
+
+The plot shows strong clustering of Event/Concert Organisers at short spatial and temporal distances, meaning businesses tend to form close to each other in both location and time. As distance increases, clustering weakens, indicating limited spread across wider areas or longer periods. Overall, the pattern reflects concentrated hotspots rather than random or evenly distributed growth.
+
+
 # 8 Conclusion
 
-1 Zoning & floorspace allocation:
-Clustering of restaurants/cafés around the city core and MRT nodes argues for safeguarding and intensifying F&B floorspace in those precincts through mixed-use/commercial zoning, higher plot ratios and permissive ground-floor uses. This matches Singaporeans’ lifestyle of dining out frequently, meeting in malls/shophouses, and seeking air-conditioned venues near transit. Retail clothing, concentrated in a few hubs, supports planning “comparison-retail” corridors in regional centres; meanwhile, gyms—patchier and residential-led—should be allowed as ancillary uses in new HDB/commercial blocks to advance a 15-minute-city where daily fitness is within walking distance.
+1) Zoning & floorspace strategy
+The CSR tests and KDE maps show strong clustering for Restaurants/Cafés and Retail Clothing, especially in the Central Region (e.g., Chinatown, Lavender, Geylang East, Cecil). Safeguard and intensify commercial/F&B floorspace in these proven hotspots via mixed-use zoning, higher plot ratios, and permissive active-frontage uses at ground level. Designate “comparison-retail” corridors in regional hubs (e.g., Woodlands East, Tampines East) where retail clusters already emerge. For Fitness Centres—dispersed but concentrated in residential towns—permit gyms as ancillary uses in HDB/commercial blocks and community facilities to underpin a 15-minute city.
 
-2 Location guidance & development management:
-Outlier subzones help manage saturation and steer new entrants. In very dense F&B/event streets, use frontage caps, exhaust/noise controls and queue management; direct applicants to adjacent streets with capacity. In cold spots, pilot pop-ups or white-site tenders before permanent rezoning. This balances vibrancy with liveability—important in Singapore where residents prize clean, orderly neighbourhoods yet enjoy lively eating and entertainment streets.
+2) Location guidance & development management
+Outlier subzones flag both saturation risks and growth opportunities. In very dense F&B/event streets, apply frontage caps, stack exhaust/noise controls, and queue/servicing management; steer additional applicants to adjacent streets with capacity to prevent amenity conflicts. In cold spots, use time-limited pilots (pop-ups, white sites) to test demand before permanent rezoning. This channels growth while protecting liveability.
 
-3 Mobility & public realm:
-Hotspots cluster around MRT interchanges; strengthen last-mile walking/cycling links, sheltered connectors, loading bays and lighting. For event organisers near major venues, designate event logistics zones (coach lay-bys, barricade anchor points, sound buffers, dispersal routes). This aligns with a transit-centric lifestyle: most outings—shopping, meals, concerts—are planned around MRT accessibility and comfortable, weather-protected pedestrian networks.
+3) Mobility & servicing
+Hotspots cluster around MRT interchanges and city cores; strengthen last-mile access: sheltered links, lighting, barrier-free routes, bicycle parking, and off-street loading/coach lay-bys. Around event nodes, pre-plan logistics zones (barricade anchors, sound buffers, dispersal routes) to reduce spillover onto neighbourhood streets.
 
-4 Equity & health outcomes:
-Spatial gaps show where everyday services are scarce. Bake fitness rooms, affordable eateries and daily-needs retail into new community hubs, sports centres and town-centre upgrades, reserving units via planning conditions or public leasing. This supports Singaporeans’ emphasis on active ageing, school-to-CCA commutes, and family meals close to home, reducing travel time and expense for heartland households.
+4) Equity, health & everyday access
+Spatial gaps—especially in peripheral/western areas for gyms and F&B—indicate under-served populations. Bake fitness rooms, affordable eateries, and daily-needs retail into town-centre upgrades, sports hubs, and new community facilities. Reserve a share of units through planning conditions or public leasing to secure price-accessible offers near homes and schools, supporting active ageing and after-school trips.
 
-5 Economic resilience:
-Registrations show F&B most vibrant, retail clothing stable, events moderating, gyms variable. Calibrate support accordingly: incubator kitchens and shorter licenses for pop-up events; longer tenures for anchor retail to stabilise nascent corridors; flexible unit sizes for gyms. This echoes Singapore’s fast-evolving consumer habits—late-night dining, festival seasons, and mall-based shopping—while cushioning small operators against demand swings.
+5) Economic resilience & tenancy mix
+Temporal trends (Jan 2024–Jun 2025) show Restaurants and Cafés expanding fastest, retail clothing stable, events moderating, and gyms fluctuating. Support should match sector needs: flexible licences and incubator kitchens for F&B, longer leases for anchor retail, adaptable spaces for gyms, and streamlined permits for event organisers. Such measures stabilise tenancy, cushion small operators from volatility, and keep urban centres resilient and responsive to shifting consumer habits.
 
-6 Monitoring & evidence-led reviews:
-Re-run G/F/K/L + CSR envelopes annually by region. Tie thresholds (e.g., K above a set value within 800 m) to actions: pause new F&B in oversaturated streets; activate incentives in underserved towns. Public dashboards can inform residents and entrepreneurs—consistent with Singapore’s data-driven governance and the public’s appetite for transparent, pragmatic planning that keeps neighbourhoods both lively and livable.
+6) Evidence-led triggers & monitoring
+Institutionalise annual re-runs of G/F/K/L functions and KDE by region. Tie quantitative thresholds to actions—for example, pause new F&B approvals when K exceeds a set benchmark within 800 m of saturated streets; activate incentives where densities fall below target in new towns. Publish a simple dashboard so residents and entrepreneurs can see hotspot/cold-spot status and pipeline capacity, aligning with transparent, data-driven governance.
+
+
+Use clustering to reinforce proven commercial cores, gap analysis to rebalance access in heartlands, and time-series trends to right-size controls and support. This keeps neighbourhoods lively yet liveable, aligns supply with transit and demand, and builds a resilient, 15-minute urban economy.
