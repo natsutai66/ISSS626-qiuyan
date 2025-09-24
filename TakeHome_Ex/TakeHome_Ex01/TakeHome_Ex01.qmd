@@ -592,7 +592,7 @@ clarkevans.test(biz_93111_ppp,
                 nsim=99)
 ```
 
-Since p<0.05, we reject the null hypothesis (H0), and conclude that the distribution of Fitness centres and gymnasiums is significantly clustered.
+Since p\<0.05, we reject the null hypothesis (H0), and conclude that the distribution of Fitness centres and gymnasiums is significantly clustered.
 
 ### 4.1.2 Kernel Density Estimation Method
 
@@ -680,7 +680,7 @@ plot(L_93111_cr.csr, . - r ~ r,
      xlab = "d (m)", ylab = "L(d) - r", xlim=c(0,1000))
 ```
 
-The observed curve (black line) lies well above the theoretical expectation (red dashed line) and consistently exceeds the grey simulation envelope, indicating strong deviation from complete spatial randomness. Clustering begins almost immediately at short distances of less than 100 metres and persists across the entire range up to 1000 metres. This pattern shows that fitness centres are not evenly spread but instead concentrate in close proximity, forming spatial hotspots. Such clustering suggests that businesses tend to locate near established hubs. 
+The observed curve (black line) lies well above the theoretical expectation (red dashed line) and consistently exceeds the grey simulation envelope, indicating strong deviation from complete spatial randomness. Clustering begins almost immediately at short distances of less than 100 metres and persists across the entire range up to 1000 metres. This pattern shows that fitness centres are not evenly spread but instead concentrate in close proximity, forming spatial hotspots. Such clustering suggests that businesses tend to locate near established hubs.
 
 Since the observed values fall outside the CSR envelope at nearly all distances, the null hypothesis of random distribution is rejected. Therefore, fitness centres in the Central Region exhibit statistically significant clustering across both small and larger spatial scales.
 
@@ -863,6 +863,8 @@ cr93111_stik <- STIKhat(cr93111_stpp)
 plotK(cr93111_stik)
 ```
 
+![](images/clipboard-3548921191.png)
+
 The plot shows high contour values at short spatial and temporal distances, indicating strong clustering of fitness centres and gymnasiums close together in both space and time. As distance and time increase, the contours flatten, suggesting weaker clustering or more random patterns. This means new establishments tend to open near existing ones within similar time periods, reflecting demand-driven clustering in central hotspots.
 
 # 5 Analysis of Retail sale of clothing for adults
@@ -951,7 +953,7 @@ clarkevans.test(biz_47711_ppp,
                 nsim=99)
 ```
 
-Since p<0.05, we reject the null hypothesis (H0), and conclude that the distribution of Retail sale of clothing for adults is significantly clustered.
+Since p\<0.05, we reject the null hypothesis (H0), and conclude that the distribution of Retail sale of clothing for adults is significantly clustered.
 
 ### 5.1.2 Kernel Density Estimation Method
 
@@ -1066,7 +1068,7 @@ plot(L_47711_cr.csr, . - r ~ r,
      xlab = "d (m)", ylab = "L(d) - r", xlim=c(0,1000))
 ```
 
-The observed curve (black line) rises steeply above the theoretical expectation (red dashed line) and quickly exceeds the grey simulation envelope, indicating strong deviation from complete spatial randomness. Clustering begins almost immediately, at distances under 100 metres, and remains significant across the entire range up to 1000 metres. This suggests that retail clothing outlets are located very close to one another, forming dense commercial clusters rather than being evenly distributed. The sharp rise at short distances highlights intense clustering in core shopping zones, while the sustained elevation across longer distances reflects broader regional hubs. 
+The observed curve (black line) rises steeply above the theoretical expectation (red dashed line) and quickly exceeds the grey simulation envelope, indicating strong deviation from complete spatial randomness. Clustering begins almost immediately, at distances under 100 metres, and remains significant across the entire range up to 1000 metres. This suggests that retail clothing outlets are located very close to one another, forming dense commercial clusters rather than being evenly distributed. The sharp rise at short distances highlights intense clustering in core shopping zones, while the sustained elevation across longer distances reflects broader regional hubs.
 
 Since the observed values consistently fall outside the CSR envelope, the null hypothesis is rejected. Therefore, retail clothing outlets in the Central Region are not randomly distributed but significantly clustered across multiple spatial scales.
 
@@ -1251,6 +1253,8 @@ cr47711_stik <- STIKhat(cr47711_stpp)
 plotK(cr47711_stik)
 ```
 
+![](images/clipboard-459476907.png)
+
 The plot shows strong clustering of events at short spatial and temporal distances, meaning activities occur close together in both space and time. As distance and time increase, clustering weakens and distribution becomes more dispersed. This indicates businesses or events tend to concentrate locally within shorter periods, rather than being randomly spread across space and time.
 
 ### 5.2.2 East Region Second-order Spatial Point Patterns Analysis
@@ -1273,7 +1277,7 @@ plot(L_47711_er.csr, . - r ~ r,
      xlab = "d (m)", ylab = "L(d) - r", xlim=c(0,1000))
 ```
 
-The L-function plot for retail clothing stores in the East Region shows that clustering begins to emerge at very short distances, around 50–100 meters, as the observed curve (black line) rises steeply above the theoretical expectation (red dashed line). This indicates that outlets are often located close to each other rather than being randomly spread. The separation between the observed and theoretical lines continues to widen beyond 200 meters and remains consistently above the simulation envelope (grey band) across the 1,000-meter range, confirming sustained clustering at multiple scales. 
+The L-function plot for retail clothing stores in the East Region shows that clustering begins to emerge at very short distances, around 50–100 meters, as the observed curve (black line) rises steeply above the theoretical expectation (red dashed line). This indicates that outlets are often located close to each other rather than being randomly spread. The separation between the observed and theoretical lines continues to widen beyond 200 meters and remains consistently above the simulation envelope (grey band) across the 1,000-meter range, confirming sustained clustering at multiple scales.
 
 The strong and early deviation suggests that retail stores in the East Region concentrate heavily in specific commercial hubs, forming dense clusters rather than dispersing evenly. Thus, the null hypothesis is rejected, confirming that retail clothing outlets in this region are significantly clustered rather than randomly distributed.
 
@@ -1456,6 +1460,8 @@ er47711_stik <- STIKhat(er47711_stpp)
 plotK(er47711_stik)
 ```
 
+![](images/clipboard-726022594.png)
+
 The plot shows strong clustering of retail clothing businesses at short spatial and temporal distances, meaning new outlets often emerge near existing ones within similar timeframes. As distance increases, clustering weakens and patterns become more dispersed, indicating localized rather than widespread expansion.
 
 ### 5.2.3 North Region Second-order Spatial Point Patterns Analysis
@@ -1478,7 +1484,7 @@ plot(L_47711_nr.csr, . - r ~ r,
      xlab = "d (m)", ylab = "L(d) - r", xlim=c(0,1000))
 ```
 
-The L-function for retail clothing in the North Region shows that clustering begins almost immediately at short distances, with the observed line rising above the theoretical expectation and the simulation envelope. Strong clustering is evident from around 50 meters and continues consistently as the distance increases, reaching values well above the random expectation up to 1,000 meters. This indicates that retail clothing outlets in the North Region tend to locate close to each other, forming significant clusters rather than being randomly distributed. The steep rise in the observed curve at smaller distances suggests dense grouping in local areas, likely around key commercial nodes or residential centers. 
+The L-function for retail clothing in the North Region shows that clustering begins almost immediately at short distances, with the observed line rising above the theoretical expectation and the simulation envelope. Strong clustering is evident from around 50 meters and continues consistently as the distance increases, reaching values well above the random expectation up to 1,000 meters. This indicates that retail clothing outlets in the North Region tend to locate close to each other, forming significant clusters rather than being randomly distributed. The steep rise in the observed curve at smaller distances suggests dense grouping in local areas, likely around key commercial nodes or residential centers.
 
 Since the observed function lies far outside the simulation envelope across nearly all distances, the null hypothesis of complete spatial randomness is rejected, confirming strong spatial clustering of retail clothing outlets in the North Region.
 
@@ -1663,6 +1669,8 @@ nr47711_stik <- STIKhat(nr47711_stpp)
 plotK(nr47711_stik)
 ```
 
+![](images/clipboard-2283929820.png)
+
 The plot shows strong clustering of retail clothing outlets at short spatial and temporal distances, meaning new shops often open near existing ones within similar timeframes. As distance and time increase, clustering weakens, indicating more dispersed distribution across the region.
 
 # 6 Analysis of Restaurants and Cafés
@@ -1749,7 +1757,7 @@ clarkevans.test(biz_56111_ppp,
                 nsim=99)
 ```
 
-Since p<0.05, we reject the null hypothesis (H0), and conclude that the distribution of Restaurants and Cafés is significantly clustered.
+Since p\<0.05, we reject the null hypothesis (H0), and conclude that the distribution of Restaurants and Cafés is significantly clustered.
 
 ### 6.1.2 Kernel Density Estimation Method
 
@@ -1835,7 +1843,7 @@ plot(L_56111_cr.csr, . - r ~ r,
      xlab = "d (m)", ylab = "L(d) - r", xlim=c(0,1000))
 ```
 
-The L-function for Restaurants and Cafés in the Central Region shows clear evidence of clustering. The observed line (black) rises well above the theoretical expectation (red dashed line) almost immediately from very short distances, indicating that clustering begins at scales as small as 50–100 meters. This pattern persists consistently across the entire range up to 1,000 meters, with the observed values remaining significantly outside the simulation envelope (grey band). The strong deviation from randomness demonstrates that restaurants and cafés are not randomly distributed but instead form dense clusters within close proximity. This reflects urban dynamics where eateries are concentrated in popular commercial zones, shopping belts, and transport hubs to maximize footfall. 
+The L-function for Restaurants and Cafés in the Central Region shows clear evidence of clustering. The observed line (black) rises well above the theoretical expectation (red dashed line) almost immediately from very short distances, indicating that clustering begins at scales as small as 50–100 meters. This pattern persists consistently across the entire range up to 1,000 meters, with the observed values remaining significantly outside the simulation envelope (grey band). The strong deviation from randomness demonstrates that restaurants and cafés are not randomly distributed but instead form dense clusters within close proximity. This reflects urban dynamics where eateries are concentrated in popular commercial zones, shopping belts, and transport hubs to maximize footfall.
 
 Given that the observed function exceeds the confidence bounds throughout, the null hypothesis is rejected. The results highlight strong, sustained clustering patterns across all distances in the Central Region.
 
@@ -1998,7 +2006,7 @@ legend_panel <-
 tmap_arrange(map_facets, legend_panel, ncol = 2, widths = c(6, 1))
 ```
 
-The monthly KDE plots for Restaurants and Cafés in the Central Region show clear and persistent clustering across the 18 months. The hotspots remain concentrated in central, high-demand areas, with intensity strengthening during several months in mid-to-late 2024, visible in brighter density patches. By early 2025, these patterns stabilise, indicating consolidation rather than continued rapid expansion. Peripheral areas remain consistently low in density, suggesting limited activity outside key urban hubs. The clustering near established centres reflects a strong centralisation effect, where new outlets tend to locate close to existing ones to leverage high customer flows from offices, retail malls, and tourist zones. 
+The monthly KDE plots for Restaurants and Cafés in the Central Region show clear and persistent clustering across the 18 months. The hotspots remain concentrated in central, high-demand areas, with intensity strengthening during several months in mid-to-late 2024, visible in brighter density patches. By early 2025, these patterns stabilise, indicating consolidation rather than continued rapid expansion. Peripheral areas remain consistently low in density, suggesting limited activity outside key urban hubs. The clustering near established centres reflects a strong centralisation effect, where new outlets tend to locate close to existing ones to leverage high customer flows from offices, retail malls, and tourist zones.
 
 The temporal changes reflect bursts of business growth cycles rather than shifts in location, supporting the interpretation that the Central Region dominates Singapore’s restaurant and café landscape, with suburban zones playing only a minor role.
 
@@ -2017,6 +2025,8 @@ cr56111_stik <- STIKhat(cr56111_stpp)
 
 plotK(cr56111_stik)
 ```
+
+![](images/clipboard-2323381766.png)
 
 The plot shows high contour values at short spatial and temporal distances, indicating strong clustering of restaurants and cafés close together in both space and time. As distance and time increase, the contours flatten, suggesting weaker clustering or more random patterns. This means establishments tend to open near existing ones within similar periods, reinforcing central hotspots as key business clusters.
 
@@ -2104,7 +2114,7 @@ clarkevans.test(biz_82303_ppp,
                 nsim=99)
 ```
 
-Since p<0.05, we reject the null hypothesis (H0), and conclude that the distribution of Event/Concert Organisers is significantly clustered.
+Since p\<0.05, we reject the null hypothesis (H0), and conclude that the distribution of Event/Concert Organisers is significantly clustered.
 
 ### 7.1.2 Kernel Density Estimation Method
 
@@ -2192,7 +2202,7 @@ plot(L_82303_cr.csr, . - r ~ r,
      xlab = "d (m)", ylab = "L(d) - r", xlim=c(0,1000))
 ```
 
-The L-function plot for Event/Concert Organisers in the Central Region indicates strong clustering at short distances. The observed curve (black line) rises sharply above the theoretical expectation (red dashed line) almost immediately from distances near 0, clearly surpassing the simulation envelope. This suggests that clustering begins at very small scales, around 50–100 metres, where organisers are tightly concentrated. The curve continues to remain well above the expected line across the full range up to 1,000 metres, confirming persistent clustering beyond local neighbourhoods. The sharp early rise reflects the tendency of organisers to locate close to one another, likely to benefit from shared infrastructure, accessibility, and audience catchment in central urban areas. 
+The L-function plot for Event/Concert Organisers in the Central Region indicates strong clustering at short distances. The observed curve (black line) rises sharply above the theoretical expectation (red dashed line) almost immediately from distances near 0, clearly surpassing the simulation envelope. This suggests that clustering begins at very small scales, around 50–100 metres, where organisers are tightly concentrated. The curve continues to remain well above the expected line across the full range up to 1,000 metres, confirming persistent clustering beyond local neighbourhoods. The sharp early rise reflects the tendency of organisers to locate close to one another, likely to benefit from shared infrastructure, accessibility, and audience catchment in central urban areas.
 
 Since the observed values consistently exceed the simulation envelope, the null hypothesis of complete spatial randomness is rejected. This confirms that event/concert organisers in the Central Region exhibit strong non-random spatial clustering across multiple distance scales.
 
@@ -2371,24 +2381,20 @@ cr82303_stik <- STIKhat(cr82303_stpp)
 plotK(cr82303_stik)
 ```
 
+![](images/clipboard-624913665.png)
+
 The plot shows strong clustering of Event/Concert Organisers at short spatial and temporal distances, meaning businesses tend to form close to each other in both location and time. As distance increases, clustering weakens, indicating limited spread across wider areas or longer periods. Overall, the pattern reflects concentrated hotspots rather than random or evenly distributed growth.
 
 # 8 Conclusion
 
-1. Reinforce mixed-use, transit-oriented hubs:
-Clustering of restaurants/cafés and adult apparel at sub-100 m to ~1 km scales, with monthly intensity peaks, confirms strong agglomeration around MRT nodes, malls, and high-footfall streets. Planning should safeguard flexible ground/mezzanine GFA for F&B, retail, and small venues within 400–800 m of stations, require active frontages, and deliver weather-protected pedestrian links that stitch malls, street dining, and venue entries into one coherent, walkable circuit.
+1.  Reinforce mixed-use, transit-oriented hubs: Clustering of restaurants/cafés and adult apparel at sub-100 m to \~1 km scales, with monthly intensity peaks, confirms strong agglomeration around MRT nodes, malls, and high-footfall streets. Planning should safeguard flexible ground/mezzanine GFA for F&B, retail, and small venues within 400–800 m of stations, require active frontages, and deliver weather-protected pedestrian links that stitch malls, street dining, and venue entries into one coherent, walkable circuit.
 
-2. Close daily-needs gaps for fitness:
-Fitness centres cluster in central/eastern subzones while peripheral towns remain underserved. To advance 15-minute living and health equity, allocate small-format commercial units for gyms/physio in HDB town centres and neighborhood hubs, co-locate with ActiveSG facilities and park connectors, and pilot fit-out grants or stepped rents where supply is thin. These moves reduce travel frictions, spread activity beyond the core, and support off-peak, localised trip-chaining after work or school.
+2.  Close daily-needs gaps for fitness: Fitness centres cluster in central/eastern subzones while peripheral towns remain underserved. To advance 15-minute living and health equity, allocate small-format commercial units for gyms/physio in HDB town centres and neighborhood hubs, co-locate with ActiveSG facilities and park connectors, and pilot fit-out grants or stepped rents where supply is thin. These moves reduce travel frictions, spread activity beyond the core, and support off-peak, localised trip-chaining after work or school.
 
-3. Manage event externalities, spread benefits:
-Event/concert organisers concentrate in central districts to leverage infrastructure and audiences, creating periodic pressure on streets, noise environments, and last-mile transit. Embed queueing pockets, loading bays, acoustic buffers, and night-time management plans in development control; align bus/train headways to seasonal peaks observed in ST-KDE. In parallel, designate secondary culture nodes in regional centres with permissive temporary-use policies so smaller happenings decentralise without diluting signature CBD anchors.
+3.  Manage event externalities, spread benefits: Event/concert organisers concentrate in central districts to leverage infrastructure and audiences, creating periodic pressure on streets, noise environments, and last-mile transit. Embed queueing pockets, loading bays, acoustic buffers, and night-time management plans in development control; align bus/train headways to seasonal peaks observed in ST-KDE. In parallel, designate secondary culture nodes in regional centres with permissive temporary-use policies so smaller happenings decentralise without diluting signature CBD anchors.
 
-4. Sequence retail/F&B supply to avoid monocultures:
-L-function results show tight co-location benefits but risk overshoot and rent spirals. Use phased release of retail/F&B GFA, frontage diversity guidelines (caps on identical uses per block), and curated street mixes to maintain resilience. Encourage upper-storey white-site flexibility so space can pivot between boutique retail, studios, or small venues as cycles shift, sustaining day-to-night activation without saturating any single category.
+4.  Sequence retail/F&B supply to avoid monocultures: L-function results show tight co-location benefits but risk overshoot and rent spirals. Use phased release of retail/F&B GFA, frontage diversity guidelines (caps on identical uses per block), and curated street mixes to maintain resilience. Encourage upper-storey white-site flexibility so space can pivot between boutique retail, studios, or small venues as cycles shift, sustaining day-to-night activation without saturating any single category.
 
-5. Design streets for the whole “lifestyle chain”:
-Since people often exercise, shop, dine, and gather in one trip, public realm design should make those sequences seamless. Prioritise wider sidewalks, shade, at-grade crossings, end-of-trip cycling facilities near gyms and malls, and wayfinding that links MRT exits to F&B streets and venues. Pocket plazas and micro-event spaces at block corners can absorb peaks, reduce conflicts, and keep footfall circulating within the district rather than spilling into carriageways.
+5.  Design streets for the whole “lifestyle chain”: Since people often exercise, shop, dine, and gather in one trip, public realm design should make those sequences seamless. Prioritise wider sidewalks, shade, at-grade crossings, end-of-trip cycling facilities near gyms and malls, and wayfinding that links MRT exits to F&B streets and venues. Pocket plazas and micro-event spaces at block corners can absorb peaks, reduce conflicts, and keep footfall circulating within the district rather than spilling into carriageways.
 
-6. Operationalise monitoring with your spatio-temporal signals:
-Turn monthly KDE stacks and hotspot persistence into KPIs per subzone (e.g., three-month intensity rise, amenity threshold gaps). Use thresholds to trigger interventions: pedestrian-realm upgrades and transit boosts where clusters intensify; incentives and safeguarded units where daily-needs amenities lag. A light-touch, data-driven loop lets URA/landlords fine-tune space, streets, and service levels so central hubs are reinforced, regional nodes mature, and everyday city life stays convenient, vibrant, and inclusive.
+6.  Operationalise monitoring with your spatio-temporal signals: Turn monthly KDE stacks and hotspot persistence into KPIs per subzone (e.g., three-month intensity rise, amenity threshold gaps). Use thresholds to trigger interventions: pedestrian-realm upgrades and transit boosts where clusters intensify; incentives and safeguarded units where daily-needs amenities lag. A light-touch, data-driven loop lets URA/landlords fine-tune space, streets, and service levels so central hubs are reinforced, regional nodes mature, and everyday city life stays convenient, vibrant, and inclusive.
