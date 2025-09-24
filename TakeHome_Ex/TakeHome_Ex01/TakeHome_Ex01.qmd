@@ -10,7 +10,7 @@ execute:
   freeze: true
 ---
 
-This report examines the spatial and temporal patterns of four lifestyle-related business sectors in Singapore—fitness centres, retail clothing, restaurants and cafés, and event/concert organisers—using ACRA registration data from January 2024 to June 2025. The data was cleaned, geocoded with OneMap, and analysed within Master Plan 2019 subzone boundaries. Methods included choropleth mapping, Kernel Density Estimation (KDE), and spatio-temporal point pattern analysis implemented in R. The results reveal concentrated clusters of restaurants and retail in central hubs, dispersed but residential-led fitness facilities, and event organisers located near major venues. These patterns highlight both hotspots and underserved areas, providing evidence to guide zoning, facility provision, and urban planning strategies that balance vibrancy, equity, and resilience in Singapore’s compact cityscape.
+This project maps how four lifestyle sectors—fitness centres (SSIC 93111), adult apparel retail (47711), restaurants and cafés (56111), and event/concert organisers (82303)—shape Singapore’s urban rhythms from Jan 2024 to Jun 2025. We clean ACRA registrations, geocode via OneMap, and analyse spatial and spatio-temporal clustering with sf, tmap, and spatstat/stpp to reveal persistent hotspots and monthly pulses. The pipeline pinpoints where amenities concentrate around transit and commercial cores and where neighbourhood gaps remain. These signals guide land-use and management choices—from activating MRT-adjacent frontages to seeding daily-needs in undersupplied towns and calibrating event operations—toward vibrant, 15-minute living.
 
 # 1 Loading the R packages
 
@@ -40,7 +40,6 @@ stpp - Spatio-temporal point pattern analysis: analyse events distributed in bot
 pacman::p_load(tidyverse, sf, tmap, httr, dplyr, ggplot2, 
                patchwork, terra, spatstat, rvest, sparr, stpp)
 ```
-
 
 # 2 Data Importing and Wrangling
 
@@ -143,9 +142,9 @@ biz_82303 <- acra_data %>%
 
 ## 2.3 Geocoding
 
-The code below performs geocoding for each business type using the SLA OneMap API. It first extracts unique postal codes from the dataset and queries the API to retrieve corresponding geographic coordinates and address details. 
+The code below performs geocoding for each business type using the SLA OneMap API. It first extracts unique postal codes from the dataset and queries the API to retrieve corresponding geographic coordinates and address details.
 
-The results are separated into two groups: found (postal codes successfully matched) and not_found (unmatched codes). The matched geocode results are tidied and joined back into the business dataset, enriching each record with spatial information. 
+The results are separated into two groups: found (postal codes successfully matched) and not_found (unmatched codes). The matched geocode results are tidied and joined back into the business dataset, enriching each record with spatial information.
 
 Finally, the updated dataset is saved as an .rds file, and an sf (Simple Features) object is created with EPSG:3414 projection, enabling spatial analysis and mapping of the businesses.
 
@@ -423,7 +422,6 @@ biz_56111_ppp = biz_56111_ppp[sg_owin]
 biz_82303_ppp = biz_82303_ppp[sg_owin]
 ```
 
-
 # 3 Business Overview
 
 ## Visualising the distribution
@@ -481,13 +479,17 @@ Overall, the distribution highlights food services as the most vibrant and rapid
 tmap_mode("view")
 
 tm_shape(biz_93111_sf) +
-  tm_dots(col = "#1f78b4", size = 0.3, alpha = 0.7, id = "entity_name", legend.show = TRUE) +
+  tm_dots(col = "#1f78b4", size = 0.3, alpha = 0.7, id = "entity_name", legend.show = TRUE,
+          group = "Fitness centres and gymnasiums") +
 tm_shape(biz_47711_sf) +
-  tm_dots(col = "#e31a1c", size = 0.3, alpha = 0.7, id = "entity_name", legend.show = TRUE) +
+  tm_dots(col = "#e31a1c", size = 0.3, alpha = 0.7, id = "entity_name", legend.show = TRUE,
+          group = "Retail sale of clothing for adults") +
 tm_shape(biz_56111_sf) +
-  tm_dots(col = "#33a02c", size = 0.3, alpha = 0.7, id = "entity_name", legend.show = TRUE) +
+  tm_dots(col = "#33a02c", size = 0.3, alpha = 0.7, id = "entity_name", legend.show = TRUE,
+          group = "Restaurants and Cafés") +
 tm_shape(biz_82303_sf) +
-  tm_dots(col = "#ff7f00", size = 0.3, alpha = 0.7, id = "entity_name", legend.show = TRUE) +
+  tm_dots(col = "#ff7f00", size = 0.3, alpha = 0.7, id = "entity_name", legend.show = TRUE,
+          group = "Event/Concert Organisers") +
 tm_layout(legend.outside = TRUE,
           legend.title.size = 1.2,
           legend.text.size = 0.9) +
@@ -506,11 +508,9 @@ Event and Concert Organisers (orange dots) are concentrated in the city centre a
 
 Overall, the distribution highlights Singapore’s mixed pattern of decentralised services for daily needs, such as gyms and dining, alongside a strong centralisation of lifestyle retail and event businesses in key urban and commercial cores.
 
-
 # 4 Analysis of Fitness centres and gymnasiums
 
 ::: panel-tabset
-
 ## Choropleth Map
 
 ```{r}
@@ -563,12 +563,11 @@ outlier_zones_sorted <- outlier_sf %>%
 # List
 print(outlier_zones_sorted)
 ```
-
 :::
 
 The choropleth map shows the distribution of fitness centres and gymnasiums across Singapore subzones. Most subzones host only 1–4 establishments, represented in lighter blue, indicating limited accessibility in many areas.
 
-However, several subzones outlined in black stand out as outliers, with counts well above the overall pattern. Notably, Cecil (22), Geylang East (14), Chinatown (13), Katong (12), and Sentosa (11) record the highest concentrations. These subzones, mainly within the Central Region, are closely linked to commercial districts, lifestyle hubs, and tourist destinations, where demand for fitness services is strongest. 
+However, several subzones outlined in black stand out as outliers, with counts well above the overall pattern. Notably, Cecil (22), Geylang East (14), Chinatown (13), Katong (12), and Sentosa (11) record the highest concentrations. These subzones, mainly within the Central Region, are closely linked to commercial districts, lifestyle hubs, and tourist destinations, where demand for fitness services is strongest.
 
 The map highlights spatial inequality, with fitness centres clustering in central and eastern urban subzones while peripheral areas remain underserved. This suggests opportunities for expanding services to improve accessibility in less well-covered regions.
 
@@ -661,53 +660,11 @@ plot(unmark(biz93111_cr_ppp.km),
 
 The map shows the spatial distribution of fitness centres and gymnasiums in the Central Region of Singapore, with notable clustering in the downtown and surrounding urban areas.
 
-### 4.2.1 Central Region 
+### 4.2.1 Central Region
 
-#### 4.2.1.1 Second-order Spatial Point Patterns Analysis 
+#### 4.2.1.1 Second-order Spatial Point Patterns Analysis
 
-##### Function estimation 
-
-```{r fig.width=10, fig.height=8}
-set.seed(1234)
-
-par(mfrow = c(2, 2))
-
-# G-function
-G_93111_cr <- Gest(biz93111_cr_ppp, correction = "border")
-plot(G_93111_cr,
-     main = "G-function (Fitness centres in Central Region)")
-
-# F-function
-F_93111_cr <- Fest(biz93111_cr_ppp)
-plot(F_93111_cr,
-     main = "F-function (Fitness centres in Central Region)")
-
-# K-function
-K_93111_cr <- Kest(biz93111_cr_ppp, correction = "Ripley")
-plot(K_93111_cr, . - r ~ r,
-     ylab = "K(d) - r", xlab = "d (m)",
-     main = "K-function (Fitness centres in Central Region)")
-
-# L-function
-L_93111_cr <- Lest(biz93111_cr_ppp, correction = "Ripley")
-plot(L_93111_cr, . - r ~ r,
-     ylab = "L(d) - r", xlab = "d (m)",
-     main = "L-function (Fitness centres in Central Region)")
-```
-
-The G-function shows the distribution of nearest-neighbour distances. The observed curve rises steeply above the Poisson expectation, indicating strong clustering, as many fitness centres are located very close to one another.
-
-The F-function, which measures empty-space distances, shows the observed distribution closer to the theoretical Poisson line but still indicating clustering. This means random points within the region are, on average, closer to a fitness centre than expected under randomness.
-
-The K-function rises well above the theoretical Poisson curve, confirming significant clustering at multiple spatial scales. The steep increase suggests that fitness centres are highly concentrated in hotspots rather than evenly spread across the region.
-
-The L-function further reinforces this, showing values much higher than the theoretical line before tapering off, highlighting strong clustering up to ~2000m before stabilising.
-
-Overall, the Central Region exhibits strong spatial clustering of fitness centres, reflecting demand around dense urban hubs.
-
-##### Complete Spatial Randomness Test
-
-To confirm the observed spatial patterns above, a hypothesis test will be conducted. The hypothesis and test are as follows:
+For complete spatial randomness test, the hypothesis and test are as follows:
 
 Ho = The distribution of Fitness centres and gymnasiums in Central Region are randomly distributed.
 
@@ -715,45 +672,17 @@ H1= The distribution of Fitness centres and gymnasiums in Central Region are not
 
 The null hypothesis will be rejected if p-value is smaller than alpha value of 0.001.
 
-```{r fig.width=10, fig.height=8}
-par(mfrow = c(2, 2))
-
-# G-function
-G_93111_cr.csr <- envelope(biz93111_cr_ppp, Gest, nsim = 999)
-plot(G_93111_cr.csr,
-     main = "G-function (Fitness centres in Central Region)",
-     xlab = "r", ylab = "G(r)")
-
-# F-function
-F_93111_cr.csr <- envelope(biz93111_cr_ppp, Fest, nsim = 999)
-plot(F_93111_cr.csr,
-     main = "F-function (Fitness centres in Central Region)",
-     xlab = "r", ylab = "F(r)")
-
-# K-function
-K_93111_cr.csr <- envelope(biz93111_cr_ppp, Kest,
-                        nsim = 99, rank = 1, glocal = TRUE)
-plot(K_93111_cr.csr, . - r ~ r,
-     main = "K-function (Fitness centres in Central Region)",
-     xlab = "d (m)", ylab = "K(d) - r")
-
-# L-function
+```{r}
 L_93111_cr.csr <- envelope(biz93111_cr_ppp, Lest,
                         nsim = 99, rank = 1, glocal = TRUE)
 plot(L_93111_cr.csr, . - r ~ r,
      main = "L-function (Fitness centres in Central Region)",
-     xlab = "d (m)", ylab = "L(d) - r")
+     xlab = "d (m)", ylab = "L(d) - r", xlim=c(0,1000))
 ```
 
-The G-function (nearest-neighbour distance) shows the observed curve far above the theoretical Poisson line, with values outside the simulation envelope. This indicates significant clustering of gyms at short distances, rejecting randomness.
+The observed curve (black line) lies well above the theoretical expectation (red dashed line) and consistently exceeds the grey simulation envelope, indicating strong deviation from complete spatial randomness. Clustering begins almost immediately at short distances of less than 100 metres and persists across the entire range up to 1000 metres. This pattern shows that fitness centres are not evenly spread but instead concentrate in close proximity, forming spatial hotspots. Such clustering suggests that businesses tend to locate near established hubs. 
 
-The F-function (empty space) shows the observed curve below the Poisson expectation and outside the envelope at several distances. This means random points in the region are generally farther from gyms than expected, reflecting clustering and gaps in coverage.
-
-The K-function lies consistently above the theoretical line and outside the envelope, confirming clustering across larger spatial scales, not just at the nearest-neighbour level.
-
-The L-function also rises well above the expected line, showing strong clustering up to ~2000m before tapering.
-
-Since observed functions consistently deviate from the theoretical Poisson distribution and cross outside the simulation envelopes, the null hypothesis (Ho) is rejected. Thus, Fitness Centres and Gymnasiums in the Central Region are not randomly distributed but exhibit significant spatial clustering.
+Since the observed values fall outside the CSR envelope at nearly all distances, the null hypothesis of random distribution is rejected. Therefore, fitness centres in the Central Region exhibit statistically significant clustering across both small and larger spatial scales.
 
 #### 4.2.1.2 Spatio-Temporal Point Patterns Analysis
 
@@ -807,46 +736,116 @@ tm_facets(by = "YearMonth", ncol = 6, nrow = 3, free.coords = FALSE, drop.units 
 tm_title("Fitness centres and gymnasiums in Central Region by Month")
 ```
 
-The faceted map shows the monthly distribution of new fitness centres and gymnasiums registered in Singapore’s Central Region from January 2024 to June 2025. Registrations were sparse in early 2024 but began to rise notably from mid-2024, peaking between July and October, before stabilising into 2025. 
+The faceted map shows the monthly distribution of new fitness centres and gymnasiums registered in Singapore’s Central Region from January 2024 to June 2025. Registrations were sparse in early 2024 but began to rise notably from mid-2024, peaking between July and October, before stabilising into 2025.
 
-Spatially, most businesses are clustered in core areas, reflecting the concentration of office workers, residents, and lifestyle demand. Outer subzones saw fewer new establishments, highlighting the urban-centric growth of the sector. 
+Spatially, most businesses are clustered in core areas, reflecting the concentration of office workers, residents, and lifestyle demand. Outer subzones saw fewer new establishments, highlighting the urban-centric growth of the sector.
 
 ##### STKDE by Month
 
 ```{r}
-months_seq <- seq(as.Date("2024-01-01"), as.Date("2025-06-01"), by = "1 month")
-labels_ym  <- format(months_seq, "%b %Y")
+start_date <- as.Date("2024-01-01")
+end_date   <- as.Date("2025-06-30")
 
-biz_93111_cr_18 <- biz_93111_cr %>%
-  filter(date >= as.Date("2024-01-01"), date <= as.Date("2025-06-30")) %>%
-  mutate(t_index = match(format(date, "%Y-%m"), format(months_seq, "%Y-%m"))) %>%
-  filter(!is.na(t_index)) %>%
-  select(t_index) 
+biz_93111_cr18 <- biz_93111_cr %>%
+  filter(date >= start_date, date <= end_date) %>%
+  mutate(MonthIndex = (year(date) - 2024) * 12 + month(date)) %>%   # Jan-2024 -> 1
+  mutate(MonthIndex = MonthIndex - (min(MonthIndex) - 1))           # renumber to 1..18
 
-cr93111_ppp  <- as.ppp(biz_93111_cr_18) %>% 
-  rjitter(retry = TRUE, nsim = 1, drop = TRUE)
+stopifnot(all(range(biz_93111_cr18$MonthIndex) == c(1, 18)))
 
-cr_owin  <- as.owin(mpsz_cr)
-cr93111_ppp_owin <- cr93111_ppp[cr_owin]
+cr_win  <- as.owin(mpsz_cr)
+xy      <- st_coordinates(biz_93111_cr18)
+
+cr_ppp <- ppp(
+  x = xy[,1], y = xy[,2],
+  window = cr_win,
+  marks  = data.frame(m = biz_93111_cr18$MonthIndex)  
+)
+
+
+cr_ppp <- rjitter(cr_ppp, retry = TRUE, nsim = 1, drop = TRUE)
+cr_ppp_win <- cr_ppp[cr_win]
 
 set.seed(1234)
-BOOT.spattemp(cr93111_ppp_owin) 
+BOOT.spattemp(cr_ppp_win) 
 ```
 
-```{r fig.width=14, fig.height=7}
-cr93111_kde <- spattemp.density(cr93111_ppp_owin,
-                             h = 700,
-                             lambda = 7)
+```{r}
+h_spat   <- 704
+lambda_t <- 6.8
 
-par(mfcol = c(3, 6), mar = c(2,2,2,4))
-for(i in 1:18){
-  plot(cr93111_kde, i,
-       override.par = FALSE, fix.range = TRUE,
-       main = labels_ym[i])
+
+m_vec    <- if (is.data.frame(marks(cr_ppp))) marks(cr_ppp)[[1]] else as.integer(marks(cr_ppp))
+t_range  <- range(m_vec, na.rm = TRUE)
+
+tab_m        <- tabulate(m_vec, nbins = 18)
+first_nonemp <- which(tab_m > 0)[1]
+
+st_first <- spattemp.density(
+  cr_ppp[m_vec == first_nonemp],
+  h      = h_spat,
+  lambda = lambda_t,
+  tlim   = t_range
+)
+
+im_first   <- st_first$spatial
+r_template <- rast(im_first) |> mask(vect(mpsz_cr))
+
+r_list <- vector("list", 18)
+
+for (i in 1:18) {
+  if (any(m_vec == i)) {
+    st_i <- spattemp.density(
+      cr_ppp[m_vec == i],
+      h      = h_spat,
+      lambda = lambda_t,
+      tlim   = t_range
+    )
+    im_i <- st_i$spatial
+    r_i  <- rast(im_i)
+  } else {
+    r_i <- r_template
+    values(r_i) <- 0
+  }
+  
+  r_i <- resample(r_i, r_template, method = "bilinear") |>
+         mask(vect(mpsz_cr))
+  
+  names(r_i) <- paste0("Month_", sprintf("%02d", i))
+  r_list[[i]] <- r_i
 }
+
+kde_stack <- do.call(c, r_list)
+crs(kde_stack) <- st_crs(mpsz_cr)$wkt
+
+
+rng <- range(values(kde_stack), na.rm = TRUE)
+tmap_mode("plot")
+
+map_facets <-
+  tm_shape(kde_stack) +
+    tm_raster(
+      col.scale  = tm_scale_continuous(values = "viridis", limits = rng),
+      col.legend = tm_legend(show = FALSE)
+    ) +
+    tm_borders(col = "grey40", lwd = 0.4) +
+    tm_facets(nrow = 3, ncol = 6, free.coords = FALSE, drop.units = TRUE) +
+    tm_layout(main.title = "Monthly KDE of Analysis of Fitness centres and gymnasiums – Central Region")
+
+legend_panel <-
+  tm_shape(kde_stack[[1]]) +
+    tm_raster(
+      col.scale  = tm_scale_continuous(values = "viridis", limits = rng),
+      col.legend = tm_legend(title = "Density values")
+    ) +
+    tm_layout(legend.only = TRUE)
+
+tmap_arrange(map_facets, legend_panel, ncol = 2, widths = c(6, 1))
 ```
 
-The spatio-temporal KDE of fitness centres and gymnasiums in the Central Region from January 2024 to June 2025 reveals persistent clustering around the downtown core. These hotspots remain stable across months, reflecting strong demand driven by Singaporeans’ lifestyle preferences for fitness facilities near workplaces, shopping districts, and residential hubs. Peripheral areas of the Central Region show relatively low density throughout, indicating that the market remains concentrated in high-traffic, commercially vibrant subzones. The consistency of these clusters highlights entrenched urban patterns where health and lifestyle services thrive in centralised locations.
+The monthly KDE maps for fitness centres and gymnasiums in the Central Region reveal a persistent clustering pattern anchored in the downtown–city fringe area. This hotspot remains stable throughout the 18 months, reflecting the concentration of fitness businesses near commercial hubs, transport interchanges, and high-density office or retail zones. A secondary but weaker concentration appears in the eastern part of the region, while the western and peripheral areas remain consistently sparse.
+
+Rather than shifting spatially, the intensity of clustering fluctuates over time. Stronger peaks are observed around mid-2024 and again in early 2025, suggesting bursts of new openings or registrations within established catchments. These fluctuations indicate that fitness centres continue to favor core urban locations with steady demand, while short-term surges in activity are likely linked to market cycles or seasonality.
 
 ##### K-function
 
@@ -863,13 +862,12 @@ cr93111_stik <- STIKhat(cr93111_stpp)
 
 plotK(cr93111_stik)
 ```
-The plot shows high contour values at short spatial and temporal distances, indicating strong clustering of fitness centres and gymnasiums close together in both space and time. As distance and time increase, the contours flatten, suggesting weaker clustering or more random patterns. This means new establishments tend to open near existing ones within similar time periods, reflecting demand-driven clustering in central hotspots.
 
+The plot shows high contour values at short spatial and temporal distances, indicating strong clustering of fitness centres and gymnasiums close together in both space and time. As distance and time increase, the contours flatten, suggesting weaker clustering or more random patterns. This means new establishments tend to open near existing ones within similar time periods, reflecting demand-driven clustering in central hotspots.
 
 # 5 Analysis of Retail sale of clothing for adults
 
 ::: panel-tabset
-
 ## Choropleth Map
 
 ```{r}
@@ -922,8 +920,7 @@ outlier_zones_sorted <- outlier_sf %>%
 # List
 print(outlier_zones_sorted)
 ```
-
-::: 
+:::
 
 The choropleth map depicts the distribution of adult clothing retail outlets across Singapore subzones. Most subzones host only 1–5 outlets, reflected by the lighter shades of red.
 
@@ -1016,7 +1013,7 @@ cr <- mpsz_cl %>%
 
 cr_owin = as.owin(cr)
 
-biz47711_cr_ppp = biz_47711_ppp[cr_owin]
+biz47711_cr_ppp = biz_47711_ppp[cr_owin] 
 biz47711_cr_ppp.km = rescale.ppp(biz47711_cr_ppp, 1000, "km")
 
 plot(unmark(biz47711_cr_ppp.km), 
@@ -1049,51 +1046,11 @@ plot(unmark(biz47711_nr_ppp.km),
 
 The maps show the distribution of retail clothing outlets across regions. In the Central Region, outlets are highly concentrated in core urban hubs, particularly around commercial districts. The East Region displays a moderate spread, with clusters around major town centers. The North Region shows fewer outlets overall, with businesses mainly concentrated near residential hubs, indicating lower retail density compared to the Central and East regions.
 
-### 5.2.1 Central Region Second-order Spatial Point Patterns Analysis 
+### 5.2.1 Central Region Second-order Spatial Point Patterns Analysis
 
-#### 5.2.1.1 Second-order Spatial Point Patterns Analysis 
+#### 5.2.1.1 Second-order Spatial Point Patterns Analysis
 
-##### Function estimation 
-
-```{r fig.width=10, fig.height=8}
-set.seed(1234)
-
-par(mfrow = c(2, 2))
-
-# G-function
-G_47711_cr <- Gest(biz47711_cr_ppp, correction = "border")
-plot(G_47711_cr,
-     main = "G-function (Retail sale of clothing in Central Region)")
-
-# F-function
-F_47711_cr <- Fest(biz47711_cr_ppp)
-plot(F_47711_cr,
-     main = "F-function (Retail sale of clothing in Central Region)")
-
-# K-function
-K_47711_cr <- Kest(biz47711_cr_ppp, correction = "Ripley")
-plot(K_47711_cr, . - r ~ r,
-     ylab = "K(d) - r", xlab = "d (m)",
-     main = "K-function (Retail sale of clothing in Central Region)")
-
-# L-function
-L_47711_cr <- Lest(biz47711_cr_ppp, correction = "Ripley")
-plot(L_47711_cr, . - r ~ r,
-     ylab = "L(d) - r", xlab = "d (m)",
-     main = "L-function (Retail sale of clothing in Central Region)")
-```
-
-The observed G-function curve rises steeply above the theoretical expectation, showing that retail clothing outlets tend to locate very close to each other. This indicates strong clustering at short distances.
-
-The observed F-function function increases faster than the Poisson expectation, meaning that from any random location in the Central Region, the nearest outlet is closer than would be expected under a random pattern. This highlights high accessibility and clustering of outlets.
-
-The observed K-function curve remains consistently above the theoretical line across all distances. This suggests that the number of neighboring outlets within varying radii is significantly greater than random, reinforcing evidence of clustering across multiple spatial scales.
-
-The observed L-function line is much higher than the Poisson baseline, with a strong peak before tapering off. This confirms intensive clustering, particularly at shorter distances, reflecting the Central Region’s role as a concentrated retail hub.
-
-##### Complete Spatial Randomness Test
-
-To confirm the observed spatial patterns above, a hypothesis test will be conducted. The hypothesis and test are as follows:
+For complete spatial randomness test, the hypothesis and test are as follows:
 
 Ho = The distribution of Retail sale of clothing for adults in Central Region are randomly distributed.
 
@@ -1101,45 +1058,17 @@ H1= The distribution of Retail sale of clothing for adults in Central Region are
 
 The null hypothesis will be rejected if p-value is smaller than alpha value of 0.001.
 
-```{r fig.width=10, fig.height=8}
-par(mfrow = c(2, 2))
-
-# G-function
-G_47711_cr.csr <- envelope(biz47711_cr_ppp, Gest, nsim = 999)
-plot(G_47711_cr.csr,
-     main = "G-function (Retail sale of clothing in Central Region)",
-     xlab = "r", ylab = "G(r)")
-
-# F-function
-F_47711_cr.csr <- envelope(biz47711_cr_ppp, Fest, nsim = 999)
-plot(F_47711_cr.csr,
-     main = "F-function (Retail sale of clothing in Central Region)",
-     xlab = "r", ylab = "F(r)")
-
-# K-function
-K_47711_cr.csr <- envelope(biz47711_cr_ppp, Kest,
-                        nsim = 99, rank = 1, glocal = TRUE)
-plot(K_47711_cr.csr, . - r ~ r,
-     main = "K-function (Retail sale of clothing in Central Region)",
-     xlab = "d (m)", ylab = "K(d) - r")
-
-# L-function
+```{r}
 L_47711_cr.csr <- envelope(biz47711_cr_ppp, Lest,
                         nsim = 99, rank = 1, glocal = TRUE)
 plot(L_47711_cr.csr, . - r ~ r,
      main = "L-function (Retail sale of clothing in Central Region)",
-     xlab = "d (m)", ylab = "L(d) - r")
+     xlab = "d (m)", ylab = "L(d) - r", xlim=c(0,1000))
 ```
 
-The G-function shows the observed curve rising much steeper than the theoretical Poisson line, indicating that retail clothing outlets in the Central Region are clustered at very short distances. 
+The observed curve (black line) rises steeply above the theoretical expectation (red dashed line) and quickly exceeds the grey simulation envelope, indicating strong deviation from complete spatial randomness. Clustering begins almost immediately, at distances under 100 metres, and remains significant across the entire range up to 1000 metres. This suggests that retail clothing outlets are located very close to one another, forming dense commercial clusters rather than being evenly distributed. The sharp rise at short distances highlights intense clustering in core shopping zones, while the sustained elevation across longer distances reflects broader regional hubs. 
 
-The F-function further supports this, as the observed line lies well below the theoretical expectation, meaning that from any random location, the nearest outlet is closer than expected under complete spatial randomness. 
-
-The K-function highlights that the observed distribution consistently exceeds the Poisson benchmark, suggesting significantly more neighboring outlets across various distances. 
-
-Similarly, the L-function demonstrates a strong deviation from the theoretical baseline, with values peaking at intermediate distances before stabilizing, which reinforces evidence of clustering. 
-
-Together, these results strongly reject the null hypothesis, showing that the distribution of retail clothing outlets in the Central Region is not random but highly clustered, reflecting commercial concentration in key shopping and business subzones.
+Since the observed values consistently fall outside the CSR envelope, the null hypothesis is rejected. Therefore, retail clothing outlets in the Central Region are not randomly distributed but significantly clustered across multiple spatial scales.
 
 #### 5.2.1.2 Spatio-Temporal Point Patterns Analysis
 
@@ -1192,7 +1121,8 @@ tm_shape(biz_47711_cr) +
 tm_facets(by = "YearMonth", ncol = 6, nrow = 3, free.coords = FALSE, drop.units = TRUE) +
 tm_title("Retail sale of clothing for adults in Central Region by Month")
 ```
-The plot illustrates the monthly distribution of retail clothing businesses from January 2024 to June 2025 in the Central Region. The pattern shows consistent clustering of new business registrations across the months, with noticeable concentrations in the core urban zones. 
+
+The plot illustrates the monthly distribution of retail clothing businesses from January 2024 to June 2025 in the Central Region. The pattern shows consistent clustering of new business registrations across the months, with noticeable concentrations in the core urban zones.
 
 While the density varies slightly month to month, the general trend highlights sustained growth and stability in demand for adult clothing retail outlets. Peaks appear in certain months, such as March, September, and early 2025, suggesting seasonal or fashion-driven cycles that influence registrations. The relatively even spread across the Central Region indicates the area remains an attractive hub for retail business activity.
 
@@ -1201,39 +1131,109 @@ Overall, the data suggests stable but strategically concentrated growth in adult
 ##### STKDE by Month
 
 ```{r}
-months_seq <- seq(as.Date("2024-01-01"), as.Date("2025-06-01"), by = "1 month")
-labels_ym  <- format(months_seq, "%b %Y")
+start_date <- as.Date("2024-01-01")
+end_date   <- as.Date("2025-06-30")
 
-biz_47711_cr_18 <- biz_47711_cr %>%
-  filter(date >= as.Date("2024-01-01"), date <= as.Date("2025-06-30")) %>%
-  mutate(t_index = match(format(date, "%Y-%m"), format(months_seq, "%Y-%m"))) %>%
-  filter(!is.na(t_index)) %>%
-  select(t_index) 
+biz_47711_cr18 <- biz_47711_cr %>%
+  filter(date >= start_date, date <= end_date) %>%
+  mutate(MonthIndex = (year(date) - 2024) * 12 + month(date)) %>%   
+  mutate(MonthIndex = MonthIndex - (min(MonthIndex) - 1))           
 
-cr47711_ppp  <- as.ppp(biz_47711_cr_18) %>% 
-  rjitter(retry = TRUE, nsim = 1, drop = TRUE)
+stopifnot(all(range(biz_47711_cr18$MonthIndex) == c(1, 18)))
 
-cr_owin  <- as.owin(mpsz_cr)
-cr47711_ppp_owin <- cr47711_ppp[cr_owin]
+cr_win  <- as.owin(mpsz_cr)
+xy      <- st_coordinates(biz_47711_cr18)
+
+cr_ppp <- ppp(
+  x = xy[,1], y = xy[,2],
+  window = cr_win,
+  marks  = data.frame(m = biz_47711_cr18$MonthIndex)  
+)
+
+
+cr_ppp <- rjitter(cr_ppp, retry = TRUE, nsim = 1, drop = TRUE)
+cr_ppp_win <- cr_ppp[cr_win]
 
 set.seed(1234)
-BOOT.spattemp(cr47711_ppp_owin) 
+BOOT.spattemp(cr_ppp_win) 
 ```
 
-```{r fig.width=14, fig.height=7}
-cr47711_kde <- spattemp.density(cr47711_ppp_owin,
-                             h = 770,
-                             lambda = 6.15)
+```{r}
+h_spat   <- 770   
+lambda_t <- 6.2
 
-par(mfcol = c(3, 6), mar = c(2,2,2,4))
-for(i in 1:18){
-  plot(cr47711_kde, i,
-       override.par = FALSE, fix.range = TRUE,
-       main = labels_ym[i])
+
+m_vec    <- if (is.data.frame(marks(cr_ppp))) marks(cr_ppp)[[1]] else as.integer(marks(cr_ppp))
+t_range  <- range(m_vec, na.rm = TRUE)
+
+tab_m        <- tabulate(m_vec, nbins = 18)
+first_nonemp <- which(tab_m > 0)[1]
+
+st_first <- spattemp.density(
+  cr_ppp[m_vec == first_nonemp],
+  h      = h_spat,
+  lambda = lambda_t,
+  tlim   = t_range
+)
+
+im_first   <- st_first$spatial
+r_template <- rast(im_first) |> mask(vect(mpsz_cr))
+
+r_list <- vector("list", 18)
+
+for (i in 1:18) {
+  if (any(m_vec == i)) {
+    st_i <- spattemp.density(
+      cr_ppp[m_vec == i],
+      h      = h_spat,
+      lambda = lambda_t,
+      tlim   = t_range
+    )
+    im_i <- st_i$spatial
+    r_i  <- rast(im_i)
+  } else {
+    r_i <- r_template
+    values(r_i) <- 0
+  }
+  
+  r_i <- resample(r_i, r_template, method = "bilinear") |>
+         mask(vect(mpsz_cr))
+  
+  names(r_i) <- paste0("Month_", sprintf("%02d", i))
+  r_list[[i]] <- r_i
 }
+
+kde_stack <- do.call(c, r_list)
+crs(kde_stack) <- st_crs(mpsz_cr)$wkt
+
+
+rng <- range(values(kde_stack), na.rm = TRUE)
+tmap_mode("plot")
+
+map_facets <-
+  tm_shape(kde_stack) +
+    tm_raster(
+      col.scale  = tm_scale_continuous(values = "viridis", limits = rng),
+      col.legend = tm_legend(show = FALSE)
+    ) +
+    tm_borders(col = "grey40", lwd = 0.4) +
+    tm_facets(nrow = 3, ncol = 6, free.coords = FALSE, drop.units = TRUE) +
+    tm_layout(main.title = "Monthly KDE of Retail sale of clothing for adults – Central Region")
+
+legend_panel <-
+  tm_shape(kde_stack[[1]]) +
+    tm_raster(
+      col.scale  = tm_scale_continuous(values = "viridis", limits = rng),
+      col.legend = tm_legend(title = "Density values")
+    ) +
+    tm_layout(legend.only = TRUE)
+
+tmap_arrange(map_facets, legend_panel, ncol = 2, widths = c(6, 1))
 ```
 
-The spatio-temporal KDE of retail clothing businesses (Jan 2024–Jun 2025) shows persistent clustering in the Central Region, with stable hotspots in major commercial hubs. Clustering intensity peaks in mid-2024 and early 2025, likely tied to festive seasons and fashion cycles. While businesses spread across multiple subzones, central districts remain the most attractive for new entrants, reflecting their dominance as high-traffic retail nodes. Month-to-month variations are modest, indicating steady activity without sharp declines. Overall, the results highlight retail clothing’s resilience, with consistent growth driven by consumer demand, reinforcing its role as a core element of Singapore’s lifestyle economy.
+The KDE plots for retail sale of clothing in the Central Region from Jan 2024 to Jun 2025 reveal clear spatial clustering. Strong peaks emerge consistently in the core areas, with higher intensities observed around Aug–Sep 2024 and again in Feb–Mar 2025, suggesting possible seasonal or market-driven cycles. The clusters remain relatively stable across most months, though their intensity fluctuates, reflecting periods of stronger retail activity. Peripheral parts of the region remain sparse, reinforcing the concentration of retail clothing outlets in central urban spaces.
+
+Compared with the point distribution maps, the KDE highlights clearer hotspot formation, showing how stores cluster tightly rather than dispersing evenly. This pattern indicates that retail clothing outlets favor concentrated locations with high customer flow, and the temporal peaks suggest that demand cycles strongly influence spatial intensity. Overall, the plots show that while the distribution is persistent, the level of clustering intensifies periodically, reflecting changing consumer and retail dynamics.
 
 ##### K-function
 
@@ -1255,51 +1255,9 @@ The plot shows strong clustering of events at short spatial and temporal distanc
 
 ### 5.2.2 East Region Second-order Spatial Point Patterns Analysis
 
-#### 5.2.2.1 Second-order Spatial Point Patterns Analysis 
+#### 5.2.2.1 Second-order Spatial Point Patterns Analysis
 
-##### Function estimation 
-
-```{r fig.width=10, fig.height=8}
-set.seed(1234)
-
-par(mfrow = c(2, 2))
-
-# G-function
-G_47711_er <- Gest(biz47711_er_ppp, correction = "border")
-plot(G_47711_er,
-     main = "G-function (Retail sale of clothing in East Region)")
-
-# F-function
-F_47711_er <- Fest(biz47711_er_ppp)
-plot(F_47711_er,
-     main = "F-function (Retail sale of clothing in East Region)")
-
-# K-function
-K_47711_er <- Kest(biz47711_er_ppp, correction = "Ripley")
-plot(K_47711_er, . - r ~ r,
-     ylab = "K(d) - r", xlab = "d (m)",
-     main = "K-function (Retail sale of clothing in East Region)")
-
-# L-function
-L_47711_er <- Lest(biz47711_er_ppp, correction = "Ripley")
-plot(L_47711_er, . - r ~ r,
-     ylab = "L(d) - r", xlab = "d (m)",
-     main = "L-function (Retail sale of clothing in East Region)")
-```
-
-The G-function for the East Region shows the observed curve rising more steeply than the Poisson expectation, suggesting clustering of retail clothing outlets at short distances. 
-
-The F-function indicates that the observed distribution lies below the theoretical line, meaning that the nearest outlet to a random location tends to be closer than expected, reinforcing evidence of clustering. 
-
-The K-function shows the observed values well above the Poisson reference across all distances, highlighting a consistently higher density of neighboring outlets than random distribution would predict. 
-
-The L-function further confirms this by showing strong positive deviations from the theoretical baseline, particularly at short to medium distances, before gradually leveling off. 
-
-Overall, the results indicate that retail clothing outlets in the East Region are not evenly spread but form distinct clusters, likely influenced by town centers, malls, and transport hubs where commercial activity is concentrated.
-
-##### Complete Spatial Randomness Test
-
-To confirm the observed spatial patterns above, a hypothesis test will be conducted. The hypothesis and test are as follows:
+For complete spatial randomness test, the hypothesis and test are as follows:
 
 Ho = The distribution of Retail sale of clothing for adults in East Region are randomly distributed.
 
@@ -1307,45 +1265,17 @@ H1= The distribution of Retail sale of clothing for adults in East Region are no
 
 The null hypothesis will be rejected if p-value is smaller than alpha value of 0.001.
 
-```{r fig.width=10, fig.height=8}
-par(mfrow = c(2, 2))
-
-# G-function
-G_47711_er.csr <- envelope(biz47711_er_ppp, Gest, nsim = 999)
-plot(G_47711_er.csr,
-     main = "G-function (Retail sale of clothing in East Region)",
-     xlab = "r", ylab = "G(r)")
-
-# F-function
-F_47711_er.csr <- envelope(biz47711_er_ppp, Fest, nsim = 999)
-plot(F_47711_er.csr,
-     main = "F-function (Retail sale of clothing in East Region)",
-     xlab = "r", ylab = "F(r)")
-
-# K-function
-K_47711_er.csr <- envelope(biz47711_er_ppp, Kest,
-                        nsim = 99, rank = 1, glocal = TRUE)
-plot(K_47711_er.csr, . - r ~ r,
-     main = "K-function (Retail sale of clothing in East Region)",
-     xlab = "d (m)", ylab = "K(d) - r")
-
-# L-function
+```{r}
 L_47711_er.csr <- envelope(biz47711_er_ppp, Lest,
                         nsim = 99, rank = 1, glocal = TRUE)
 plot(L_47711_er.csr, . - r ~ r,
      main = "L-function (Retail sale of clothing in East Region)",
-     xlab = "d (m)", ylab = "L(d) - r")
+     xlab = "d (m)", ylab = "L(d) - r", xlim=c(0,1000))
 ```
 
-The G-function for the East Region shows the observed curve well above the theoretical Poisson expectation, indicating strong clustering of retail clothing outlets at short distances. 
+The L-function plot for retail clothing stores in the East Region shows that clustering begins to emerge at very short distances, around 50–100 meters, as the observed curve (black line) rises steeply above the theoretical expectation (red dashed line). This indicates that outlets are often located close to each other rather than being randomly spread. The separation between the observed and theoretical lines continues to widen beyond 200 meters and remains consistently above the simulation envelope (grey band) across the 1,000-meter range, confirming sustained clustering at multiple scales. 
 
-The F-function further supports this, as the observed distribution lies below the theoretical curve, meaning outlets are generally closer to any random location than expected under randomness. 
-
-The K-function demonstrates that observed values exceed the Poisson baseline across all distances, suggesting higher densities of outlets than a random distribution would predict. 
-
-Similarly, the L-function shows positive deviations from the theoretical line, particularly at small to medium distances, before gradually stabilizing. 
-
-Together, these functions reveal that retail clothing outlets in the East Region are not randomly distributed but instead cluster significantly around key commercial centers and town hubs. As the observed patterns deviate consistently from randomness, the null hypothesis (Ho) is rejected in favor of clustering (H1).
+The strong and early deviation suggests that retail stores in the East Region concentrate heavily in specific commercial hubs, forming dense clusters rather than dispersing evenly. Thus, the null hypothesis is rejected, confirming that retail clothing outlets in this region are significantly clustered rather than randomly distributed.
 
 #### 5.2.2.2 Spatio-Temporal Point Patterns Analysis
 
@@ -1399,46 +1329,116 @@ tm_facets(by = "YearMonth", ncol = 6, nrow = 3, free.coords = FALSE, drop.units 
 tm_title("Retail sale of clothing for adults in East Region by Month")
 ```
 
-The monthly distribution of retail clothing businesses in the East Region (Jan 2024–Jun 2025) shows steady registrations with moderate clustering in select subzones. Peaks appear in early 2024 and early 2025, likely linked to seasonal demand or market shifts. While businesses are spread across the region, growth is uneven, with certain subzones consistently attracting more establishments. 
+The monthly distribution of retail clothing businesses in the East Region (Jan 2024–Jun 2025) shows steady registrations with moderate clustering in select subzones. Peaks appear in early 2024 and early 2025, likely linked to seasonal demand or market shifts. While businesses are spread across the region, growth is uneven, with certain subzones consistently attracting more establishments.
 
 This localized clustering suggests expansion is concentrated in established commercial areas with strong consumer traffic, rather than evenly across the region. The pattern reflects retailers’ preference for competitive yet high-demand environments, ensuring visibility and accessibility while limiting over-dispersion.
 
 ##### STKDE by Month
 
 ```{r}
-months_seq <- seq(as.Date("2024-01-01"), as.Date("2025-06-01"), by = "1 month")
-labels_ym  <- format(months_seq, "%b %Y")
+start_date <- as.Date("2024-01-01")
+end_date   <- as.Date("2025-06-30")
 
-biz_47711_er_18 <- biz_47711_er %>%
-  filter(date >= as.Date("2024-01-01"), date <= as.Date("2025-06-30")) %>%
-  mutate(t_index = match(format(date, "%Y-%m"), format(months_seq, "%Y-%m"))) %>%
-  filter(!is.na(t_index)) %>%
-  select(t_index) 
+biz_47711_er18 <- biz_47711_er %>%
+  filter(date >= start_date, date <= end_date) %>%
+  mutate(MonthIndex = (year(date) - 2024) * 12 + month(date)) %>%   
+  mutate(MonthIndex = MonthIndex - (min(MonthIndex) - 1))           
 
-er47711_ppp  <- as.ppp(biz_47711_er_18) %>% 
-  rjitter(retry = TRUE, nsim = 1, drop = TRUE)
+stopifnot(all(range(biz_47711_er18$MonthIndex) == c(1, 18)))
 
-er_owin  <- as.owin(mpsz_er)
-er47711_ppp_owin <- er47711_ppp[er_owin]
+er_win  <- as.owin(mpsz_er)
+xy      <- st_coordinates(biz_47711_er18)
+
+er_ppp <- ppp(
+  x = xy[,1], y = xy[,2],
+  window = er_win,
+  marks  = data.frame(m = biz_47711_er18$MonthIndex)  
+)
+
+
+er_ppp <- rjitter(er_ppp, retry = TRUE, nsim = 1, drop = TRUE)
+er_ppp_win <- er_ppp[er_win]
 
 set.seed(1234)
-BOOT.spattemp(er47711_ppp_owin) 
+BOOT.spattemp(er_ppp_win) 
 ```
 
-```{r fig.width=14, fig.height=7}
-er47711_kde <- spattemp.density(er47711_ppp_owin,
-                             h = 1020,
-                             lambda = 6.33)
+```{r}
+h_spat   <- 1024     
+lambda_t <- 6.3
 
-par(mfcol = c(3, 6), mar = c(2,2,2,4))
-for(i in 1:18){
-  plot(er47711_kde, i,
-       override.par = FALSE, fix.range = TRUE,
-       main = labels_ym[i])
+
+m_vec    <- if (is.data.frame(marks(er_ppp))) marks(er_ppp)[[1]] else as.integer(marks(er_ppp))
+t_range  <- range(m_vec, na.rm = TRUE)
+
+tab_m        <- tabulate(m_vec, nbins = 18)
+first_nonemp <- which(tab_m > 0)[1]
+
+st_first <- spattemp.density(
+  er_ppp[m_vec == first_nonemp],
+  h      = h_spat,
+  lambda = lambda_t,
+  tlim   = t_range
+)
+
+im_first   <- st_first$spatial
+r_template <- rast(im_first) |> mask(vect(mpsz_er))
+
+r_list <- vector("list", 18)
+
+for (i in 1:18) {
+  if (any(m_vec == i)) {
+    st_i <- spattemp.density(
+      er_ppp[m_vec == i],
+      h      = h_spat,
+      lambda = lambda_t,
+      tlim   = t_range
+    )
+    im_i <- st_i$spatial
+    r_i  <- rast(im_i)
+  } else {
+    r_i <- r_template
+    values(r_i) <- 0
+  }
+  
+  r_i <- resample(r_i, r_template, method = "bilinear") |>
+         mask(vect(mpsz_er))
+  
+  names(r_i) <- paste0("Month_", sprintf("%02d", i))
+  r_list[[i]] <- r_i
 }
+
+kde_stack <- do.call(c, r_list)
+crs(kde_stack) <- st_crs(mpsz_er)$wkt
+
+
+rng <- range(values(kde_stack), na.rm = TRUE)
+tmap_mode("plot")
+
+map_facets <-
+  tm_shape(kde_stack) +
+    tm_raster(
+      col.scale  = tm_scale_continuous(values = "viridis", limits = rng),
+      col.legend = tm_legend(show = FALSE)
+    ) +
+    tm_borders(col = "grey40", lwd = 0.4) +
+    tm_facets(nrow = 3, ncol = 6, free.coords = FALSE, drop.units = TRUE) +
+    tm_layout(main.title = "Monthly KDE of Retail sale of clothing for adults – East Region")
+
+legend_panel <-
+  tm_shape(kde_stack[[1]]) +
+    tm_raster(
+      col.scale  = tm_scale_continuous(values = "viridis", limits = rng),
+      col.legend = tm_legend(title = "Density values")
+    ) +
+    tm_layout(legend.only = TRUE)
+
+tmap_arrange(map_facets, legend_panel, ncol = 2, widths = c(6, 1))
 ```
 
-The spatio-temporal KDE of retail clothing businesses in the East Region from January 2024 to June 2025 highlights consistent clustering around key commercial zones. The density plots show strong and stable hotspots across most months. This suggests steady growth in consumer-oriented retail activity, likely reflecting rising demand in established shopping and residential hubs. While the spread of businesses remains relatively concentrated, the intensity of clustering fluctuates slightly, with occasional expansion toward peripheral areas during peak months. 
+The spatio-temporal KDE of retail clothing for adults in the East Region highlights relatively modest clustering over the 18 months from January 2024 to June 2025. Most months show low-density patterns, with only a few recurring hotspots emerging intermittently. Peaks in density are most evident in June 2024, November 2024, March 2025, and May 2025, suggesting slight seasonal or demand-driven shifts in activity. These clusters appear sporadic and localized, likely influenced by nearby residential areas and transportation access.
+
+Overall, the distribution remains dispersed across the East Region, with clustering only strengthening temporarily in certain pockets. This indicates that the retail clothing landscape here is more evenly spread and primarily serves local demand, rather than forming persistent, high-intensity commercial hubs.
 
 ##### K-function
 
@@ -1460,49 +1460,9 @@ The plot shows strong clustering of retail clothing businesses at short spatial 
 
 ### 5.2.3 North Region Second-order Spatial Point Patterns Analysis
 
-#### 5.2.3.1 Second-order Spatial Point Patterns Analysis 
+#### 5.2.3.1 Second-order Spatial Point Patterns Analysis
 
-##### Function estimation 
-
-```{r fig.width=10, fig.height=8}
-set.seed(1234)
-
-par(mfrow = c(2, 2))
-
-# G-function
-G_47711_nr <- Gest(biz47711_nr_ppp, correction = "border")
-plot(G_47711_nr,
-     main = "G-function (Retail sale of clothing in North Region)")
-
-# F-function
-F_47711_nr <- Fest(biz47711_nr_ppp)
-plot(F_47711_nr,
-     main = "F-function (Retail sale of clothing in North Region)")
-
-# K-function
-K_47711_nr <- Kest(biz47711_nr_ppp, correction = "Ripley")
-plot(K_47711_nr, . - r ~ r,
-     ylab = "K(d) - r", xlab = "d (m)",
-     main = "K-function (Retail sale of clothing in North Region)")
-
-# L-function
-L_47711_nr <- Lest(biz47711_nr_ppp, correction = "Ripley")
-plot(L_47711_nr, . - r ~ r,
-     ylab = "L(d) - r", xlab = "d (m)",
-     main = "L-function (Retail sale of clothing in North Region)")
-```
-
-The G-function for the North Region shows the observed curve consistently above the Poisson expectation, indicating clustering of retail clothing outlets at shorter distances. This suggests that outlets are located closer to each other than would be expected under randomness.
-
-The F-function highlights that the observed distribution rises more slowly than the theoretical expectation, suggesting that retail clothing outlets are not evenly spread but instead leave larger gaps in some areas before clustering in others. This reflects uneven accessibility across the region.
-
-The K-function confirms clustering, with the observed curve well above the Poisson line across all distances. This indicates higher outlet densities in certain pockets of the North Region compared to a random pattern.
-
-Finally, the L-function reinforces clustering, showing strong positive deviations from the Poisson expectation, particularly up to mid-range distances. This suggests retail clothing outlets in the North Region are spatially concentrated in specific commercial or residential hubs.
-
-##### Complete Spatial Randomness Test
-
-To confirm the observed spatial patterns above, a hypothesis test will be conducted. The hypothesis and test are as follows:
+For complete spatial randomness test, the hypothesis and test are as follows:
 
 Ho = The distribution of Retail sale of clothing for adults in North Region are randomly distributed.
 
@@ -1510,45 +1470,17 @@ H1= The distribution of Retail sale of clothing for adults in North Region are n
 
 The null hypothesis will be rejected if p-value is smaller than alpha value of 0.001.
 
-```{r fig.width=10, fig.height=8}
-par(mfrow = c(2, 2))
-
-# G-function
-G_47711_nr.csr <- envelope(biz47711_nr_ppp, Gest, nsim = 999)
-plot(G_47711_nr.csr,
-     main = "G-function (Retail sale of clothing in North Region)",
-     xlab = "r", ylab = "G(r)")
-
-# F-function
-F_47711_nr.csr <- envelope(biz47711_nr_ppp, Fest, nsim = 999)
-plot(F_47711_nr.csr,
-     main = "F-function (Retail sale of clothing in North Region)",
-     xlab = "r", ylab = "F(r)")
-
-# K-function
-K_47711_nr.csr <- envelope(biz47711_nr_ppp, Kest,
-                        nsim = 99, rank = 1, glocal = TRUE)
-plot(K_47711_nr.csr, . - r ~ r,
-     main = "K-function (Retail sale of clothing in North Region)",
-     xlab = "d (m)", ylab = "K(d) - r")
-
-# L-function
+```{r}
 L_47711_nr.csr <- envelope(biz47711_nr_ppp, Lest,
                         nsim = 99, rank = 1, glocal = TRUE)
 plot(L_47711_nr.csr, . - r ~ r,
      main = "L-function (Retail sale of clothing in North Region)",
-     xlab = "d (m)", ylab = "L(d) - r")
+     xlab = "d (m)", ylab = "L(d) - r", xlim=c(0,1000))
 ```
 
-The G-function shows that the observed distribution of retail clothing outlets lies well above the theoretical Poisson curve, indicating strong clustering at short distances. This suggests that stores in the North Region are more tightly packed than expected under randomness.
+The L-function for retail clothing in the North Region shows that clustering begins almost immediately at short distances, with the observed line rising above the theoretical expectation and the simulation envelope. Strong clustering is evident from around 50 meters and continues consistently as the distance increases, reaching values well above the random expectation up to 1,000 meters. This indicates that retail clothing outlets in the North Region tend to locate close to each other, forming significant clusters rather than being randomly distributed. The steep rise in the observed curve at smaller distances suggests dense grouping in local areas, likely around key commercial nodes or residential centers. 
 
-The F-function reveals that the observed curve rises much slower than the theoretical expectation, meaning that empty spaces are larger and outlets are concentrated in fewer subzones. This points to uneven accessibility across the region, where residents in some areas must travel further to reach outlets.
-
-The K-function confirms clustering, with the observed line consistently exceeding the Poisson baseline. This highlights that clothing outlets form dense clusters rather than being randomly scattered.
-
-Finally, the L-function shows a marked positive deviation from the theoretical line, particularly up to mid-range distances, reinforcing evidence of clustering. 
-
-Since observed patterns fall outside the simulation envelope, the null hypothesis of complete spatial randomness is rejected.
+Since the observed function lies far outside the simulation envelope across nearly all distances, the null hypothesis of complete spatial randomness is rejected, confirming strong spatial clustering of retail clothing outlets in the North Region.
 
 #### 5.2.3.2 Spatio-Temporal Point Patterns Analysis
 
@@ -1602,52 +1534,118 @@ tm_facets(by = "YearMonth", ncol = 6, nrow = 3, free.coords = FALSE, drop.units 
 tm_title("Retail sale of clothing for adults in North Region by Month")
 ```
 
-The plot illustrates the monthly distribution of retail clothing businesses in the North Region from January 2024 to June 2025. Overall, the number of new establishments appears modest compared to other regions, with businesses showing a relatively even but limited spread across subzones. 
+The plot illustrates the monthly distribution of retail clothing businesses in the North Region from January 2024 to June 2025. Overall, the number of new establishments appears modest compared to other regions, with businesses showing a relatively even but limited spread across subzones.
 
-Most months show consistent but small clusters, suggesting that clothing retail growth in this region is gradual and less concentrated. There is no sharp seasonal spike, but slight increases are visible in the first half of 2024 and early 2025, reflecting moderate expansion phases. The persistence of activity across months indicates steady consumer demand, but the lower density highlights that this region remains a secondary market for clothing retailers compared to more central areas. 
+Most months show consistent but small clusters, suggesting that clothing retail growth in this region is gradual and less concentrated. There is no sharp seasonal spike, but slight increases are visible in the first half of 2024 and early 2025, reflecting moderate expansion phases. The persistence of activity across months indicates steady consumer demand, but the lower density highlights that this region remains a secondary market for clothing retailers compared to more central areas.
 
 This pattern aligns with slower-paced development and suburban consumer dynamics, where retail activity is present but less intensive. Overall, the trend suggests stable yet modest growth in clothing retail throughout the period.
 
 ##### STKDE by Month
 
 ```{r}
-months_seq <- seq(as.Date("2024-01-01"), as.Date("2025-06-01"), by = "1 month")
-labels_ym  <- format(months_seq, "%b %Y")
+start_date <- as.Date("2024-01-01")
+end_date   <- as.Date("2025-06-30")
 
-biz_47711_nr_18 <- biz_47711_nr %>%
-  filter(date >= as.Date("2024-01-01"), date <= as.Date("2025-06-30")) %>%
-  mutate(t_index = match(format(date, "%Y-%m"), format(months_seq, "%Y-%m"))) %>%
-  filter(!is.na(t_index)) %>%
-  select(t_index) 
+biz_47711_nr18 <- biz_47711_nr %>%
+  filter(date >= start_date, date <= end_date) %>%
+  mutate(MonthIndex = (year(date) - 2024) * 12 + month(date)) %>%   
+  mutate(MonthIndex = MonthIndex - (min(MonthIndex) - 1))           
 
-nr47711_ppp  <- as.ppp(biz_47711_nr_18) %>% 
-  rjitter(retry = TRUE, nsim = 1, drop = TRUE)
+stopifnot(all(range(biz_47711_nr18$MonthIndex) == c(1, 18)))
 
-nr_owin  <- as.owin(mpsz_nr)
-nr47711_ppp_owin <- nr47711_ppp[nr_owin]
+nr_win  <- as.owin(mpsz_nr)
+xy      <- st_coordinates(biz_47711_nr18)
+
+nr_ppp <- ppp(
+  x = xy[,1], y = xy[,2],
+  window = nr_win,
+  marks  = data.frame(m = biz_47711_nr18$MonthIndex)  
+)
+
+
+nr_ppp <- rjitter(nr_ppp, retry = TRUE, nsim = 1, drop = TRUE)
+nr_ppp_win <- nr_ppp[nr_win]
 
 set.seed(1234)
-BOOT.spattemp(nr47711_ppp_owin) 
+BOOT.spattemp(nr_ppp_win) 
 ```
 
-```{r fig.width=14, fig.height=7}
-nr47711_kde <- spattemp.density(nr47711_ppp_owin,
-                             h = 835,
-                             lambda = 6.34)
+```{r}
+h_spat   <- 840       
+lambda_t <- 6.3
 
-par(mfcol = c(3, 6), mar = c(2,2,2,4))
-for(i in 1:18){
-  plot(nr47711_kde, i,
-       override.par = FALSE, fix.range = TRUE,
-       main = labels_ym[i])
+
+m_vec    <- if (is.data.frame(marks(nr_ppp))) marks(nr_ppp)[[1]] else as.integer(marks(nr_ppp))
+t_range  <- range(m_vec, na.rm = TRUE)
+
+tab_m        <- tabulate(m_vec, nbins = 18)
+first_nonemp <- which(tab_m > 0)[1]
+
+st_first <- spattemp.density(
+  nr_ppp[m_vec == first_nonemp],
+  h      = h_spat,
+  lambda = lambda_t,
+  tlim   = t_range
+)
+
+im_first   <- st_first$spatial
+r_template <- rast(im_first) |> mask(vect(mpsz_nr))
+
+r_list <- vector("list", 18)
+
+for (i in 1:18) {
+  if (any(m_vec == i)) {
+    st_i <- spattemp.density(
+      nr_ppp[m_vec == i],
+      h      = h_spat,
+      lambda = lambda_t,
+      tlim   = t_range
+    )
+    im_i <- st_i$spatial
+    r_i  <- rast(im_i)
+  } else {
+    r_i <- r_template
+    values(r_i) <- 0
+  }
+  
+  r_i <- resample(r_i, r_template, method = "bilinear") |>
+         mask(vect(mpsz_nr))
+  
+  names(r_i) <- paste0("Month_", sprintf("%02d", i))
+  r_list[[i]] <- r_i
 }
+
+kde_stack <- do.call(c, r_list)
+crs(kde_stack) <- st_crs(mpsz_nr)$wkt
+
+
+rng <- range(values(kde_stack), na.rm = TRUE)
+tmap_mode("plot")
+
+map_facets <-
+  tm_shape(kde_stack) +
+    tm_raster(
+      col.scale  = tm_scale_continuous(values = "viridis", limits = rng),
+      col.legend = tm_legend(show = FALSE)
+    ) +
+    tm_borders(col = "grey40", lwd = 0.4) +
+    tm_facets(nrow = 3, ncol = 6, free.coords = FALSE, drop.units = TRUE) +
+    tm_layout(main.title = "Monthly KDE of Retail sale of clothing for adults – North Region")
+
+legend_panel <-
+  tm_shape(kde_stack[[1]]) +
+    tm_raster(
+      col.scale  = tm_scale_continuous(values = "viridis", limits = rng),
+      col.legend = tm_legend(title = "Density values")
+    ) +
+    tm_layout(legend.only = TRUE)
+
+tmap_arrange(map_facets, legend_panel, ncol = 2, widths = c(6, 1))
 ```
 
-The Spatio-temporal KDE of retail clothing businesses in the North Region from January 2024 to June 2025 highlights modest but steady activity. The heatmaps show consistent clustering in a few concentrated areas. 
+The spatio-temporal KDE of retail clothing for adults in the North Region shows persistent clustering throughout the 18 months from January 2024 to June 2025. Hotspots remain evident across most months, with noticeable peaks in mid-2024 and early 2025, indicating stable retail activity in specific locations. These high-density areas suggest that retail outlets are concentrated in a few established pockets rather than being widely dispersed.
 
-Unlike regions with widespread or dense clusters, the North shows fewer high-density zones, reflecting a slower pace of retail expansion. The spatial concentration remains relatively stable, suggesting businesses tend to locate near existing clusters rather than dispersing widely. Temporally, the patterns indicate steady demand with occasional peaks but no sharp seasonal surges. 
-
-Overall, the analysis reveals that while the North Region supports a steady retail clothing market, growth is modest and localized, reinforcing its role as a smaller but stable contributor to the broader retail landscape.
+Although there are minor fluctuations in intensity, the overall distribution pattern highlights consistent clustering over time, reflecting strong consumer demand around key hubs. The recurring hotspots imply that retail clothing outlets in the North Region are strategically located to capture steady footfall.
 
 ##### K-function
 
@@ -1667,11 +1665,9 @@ plotK(nr47711_stik)
 
 The plot shows strong clustering of retail clothing outlets at short spatial and temporal distances, meaning new shops often open near existing ones within similar timeframes. As distance and time increase, clustering weakens, indicating more dispersed distribution across the region.
 
-
 # 6 Analysis of Restaurants and Cafés
 
 ::: panel-tabset
-
 ## Choropleth Map
 
 ```{r}
@@ -1724,8 +1720,7 @@ outlier_zones_sorted <- outlier_sf %>%
 # List
 print(outlier_zones_sorted)
 ```
-
-::: 
+:::
 
 The choropleth map shows the distribution of restaurants and cafés across Singapore subzones. Most subzones accommodate between 1 and 9 establishments, as indicated by lighter green shades.
 
@@ -1822,51 +1817,9 @@ The map shows restaurants and cafés in the Central Region, with strong clusteri
 
 ### 6.2.1 Central Region Second-order Spatial Point Patterns Analysis
 
-#### 6.2.1.1 Second-order Spatial Point Patterns Analysis 
+#### 6.2.1.1 Second-order Spatial Point Patterns Analysis
 
-##### Function estimation 
-
-```{r fig.width=10, fig.height=8}
-set.seed(1234)
-
-par(mfrow = c(2, 2))
-
-# G-function
-G_56111_cr <- Gest(biz56111_cr_ppp, correction = "border")
-plot(G_56111_cr,
-     main = "G-function (Restaurants and Cafés in Central Region)")
-
-# F-function
-F_56111_cr <- Fest(biz56111_cr_ppp)
-plot(F_56111_cr,
-     main = "F-function (Restaurants and Cafés in Central Region)")
-
-# K-function
-K_56111_cr <- Kest(biz56111_cr_ppp, correction = "Ripley")
-plot(K_56111_cr, . - r ~ r,
-     ylab = "K(d) - r", xlab = "d (m)",
-     main = "K-function (Restaurants and Cafés in Central Region)")
-
-# L-function
-L_56111_cr <- Lest(biz56111_cr_ppp, correction = "Ripley")
-plot(L_56111_cr, . - r ~ r,
-     ylab = "L(d) - r", xlab = "d (m)",
-     main = "L-function (Restaurants and Cafés in Central Region)")
-```
-
-The G-function rises steeply above the theoretical Poisson line, showing that restaurants are located very close to one another, reflecting a clustered distribution at short distances. 
-
-The F-function also lies well above the Poisson expectation, indicating that the average distance from a random point to the nearest restaurant is smaller than expected under randomness, further confirming clustering. 
-
-The K-function demonstrates a sharp increase above the theoretical line, with values growing rapidly as distance increases, suggesting significant aggregation across multiple spatial scales. 
-
-Similarly, the L-function remains far above the Poisson baseline, reinforcing that clustering persists across both short and long distances. 
-
-Overall, all four functions consistently highlight that Restaurants and Cafés in the Central Region are highly concentrated, particularly around dense commercial and lifestyle hubs, rather than being randomly or evenly distributed.
-
-##### Complete Spatial Randomness Test
-
-To confirm the observed spatial patterns above, a hypothesis test will be conducted. The hypothesis and test are as follows:
+For complete spatial randomness test, the hypothesis and test are as follows:
 
 Ho = The distribution of Restaurants and Cafés in Central Region are randomly distributed.
 
@@ -1874,45 +1827,17 @@ H1= The distribution of Restaurants and Cafés in Central Region are not randoml
 
 The null hypothesis will be rejected if p-value is smaller than alpha value of 0.001.
 
-```{r fig.width=10, fig.height=8}
-par(mfrow = c(2, 2))
-
-# G-function
-G_56111_cr.csr <- envelope(biz56111_cr_ppp, Gest, nsim = 999)
-plot(G_56111_cr.csr,
-     main = "G-function (Restaurants and Cafés in Central Region)",
-     xlab = "r", ylab = "G(r)")
-
-# F-function
-F_56111_cr.csr <- envelope(biz56111_cr_ppp, Fest, nsim = 999)
-plot(F_56111_cr.csr,
-     main = "F-function (Restaurants and Cafés in Central Region)",
-     xlab = "r", ylab = "F(r)")
-
-# K-function
-K_56111_cr.csr <- envelope(biz56111_cr_ppp, Kest,
-                        nsim = 99, rank = 1, glocal = TRUE)
-plot(K_56111_cr.csr, . - r ~ r,
-     main = "K-function (Restaurants and Cafés in Central Region)",
-     xlab = "d (m)", ylab = "K(d) - r")
-
-# L-function
+```{r}
 L_56111_cr.csr <- envelope(biz56111_cr_ppp, Lest,
                         nsim = 99, rank = 1, glocal = TRUE)
 plot(L_56111_cr.csr, . - r ~ r,
      main = "L-function (Restaurants and Cafés in Central Region)",
-     xlab = "d (m)", ylab = "L(d) - r")
+     xlab = "d (m)", ylab = "L(d) - r", xlim=c(0,1000))
 ```
 
-The G-function rises sharply above the theoretical Poisson line, suggesting restaurants are located closer to each other than expected under randomness, highlighting significant clustering at short distances. 
+The L-function for Restaurants and Cafés in the Central Region shows clear evidence of clustering. The observed line (black) rises well above the theoretical expectation (red dashed line) almost immediately from very short distances, indicating that clustering begins at scales as small as 50–100 meters. This pattern persists consistently across the entire range up to 1,000 meters, with the observed values remaining significantly outside the simulation envelope (grey band). The strong deviation from randomness demonstrates that restaurants and cafés are not randomly distributed but instead form dense clusters within close proximity. This reflects urban dynamics where eateries are concentrated in popular commercial zones, shopping belts, and transport hubs to maximize footfall. 
 
-The F-function also shows observed values above the theoretical line, indicating that random points are on average closer to the nearest restaurant, further confirming clustering.
-
-The K-function increases far above the theoretical expectation, showing that the density of restaurants within a given distance is much higher than under complete spatial randomness. 
-
-Similarly, the L-function remains well above the Poisson baseline across multiple scales, reinforcing strong aggregation rather than dispersion.
-
-Together, these functions consistently demonstrate that Restaurants and Cafés in the Central Region are highly clustered, concentrated around commercial hubs and lifestyle districts, and the observed distribution clearly deviates from randomness.
+Given that the observed function exceeds the confidence bounds throughout, the null hypothesis is rejected. The results highlight strong, sustained clustering patterns across all distances in the Central Region.
 
 #### 6.2.1.2 Spatio-Temporal Point Patterns Analysis
 
@@ -1968,43 +1893,114 @@ tm_title("Restaurants and Cafés in Central Region by Month")
 
 The spatio-temporal distribution of Restaurants and Cafés in Singapore’s Central Region from January 2024 to June 2025 shows clear clustering in urban hotspots such as the Downtown Core and surrounding commercial districts.
 
-Throughout the months, the majority of new establishments consistently concentrate in these central lifestyle and business hubs, highlighting the role of high foot traffic, office workers, and tourist activity in driving demand. The density of points increases steadily in mid-2024 and remains strong into early 2025, reflecting sustained growth in the food and beverage sector. Peripheral subzones show fewer establishments, reinforcing the dominance of central areas as the preferred locations for business ventures. 
+Throughout the months, the majority of new establishments consistently concentrate in these central lifestyle and business hubs, highlighting the role of high foot traffic, office workers, and tourist activity in driving demand. The density of points increases steadily in mid-2024 and remains strong into early 2025, reflecting sustained growth in the food and beverage sector. Peripheral subzones show fewer establishments, reinforcing the dominance of central areas as the preferred locations for business ventures.
 
 ##### STKDE by Month
 
 ```{r}
-months_seq <- seq(as.Date("2024-01-01"), as.Date("2025-06-01"), by = "1 month")
-labels_ym  <- format(months_seq, "%b %Y")
+start_date <- as.Date("2024-01-01")
+end_date   <- as.Date("2025-06-30")
 
-biz_56111_cr_18 <- biz_56111_cr %>%
-  filter(date >= as.Date("2024-01-01"), date <= as.Date("2025-06-30")) %>%
-  mutate(t_index = match(format(date, "%Y-%m"), format(months_seq, "%Y-%m"))) %>%
-  filter(!is.na(t_index)) %>%
-  select(t_index) 
+biz_56111_cr18 <- biz_56111_cr %>%
+  filter(date >= start_date, date <= end_date) %>%
+  mutate(MonthIndex = (year(date) - 2024) * 12 + month(date)) %>%  
+  mutate(MonthIndex = MonthIndex - (min(MonthIndex) - 1))           
 
-cr56111_ppp  <- as.ppp(biz_56111_cr_18) %>% 
-  rjitter(retry = TRUE, nsim = 1, drop = TRUE)
+stopifnot(all(range(biz_56111_cr18$MonthIndex) == c(1, 18)))
 
-cr_owin  <- as.owin(mpsz_cr)
-cr56111_ppp_owin <- cr56111_ppp[cr_owin]
+cr_win  <- as.owin(mpsz_cr)
+xy      <- st_coordinates(biz_56111_cr18)
+
+cr_ppp <- ppp(
+  x = xy[,1], y = xy[,2],
+  window = cr_win,
+  marks  = data.frame(m = biz_56111_cr18$MonthIndex)  
+)
+
+
+cr_ppp <- rjitter(cr_ppp, retry = TRUE, nsim = 1, drop = TRUE)
+cr_ppp_win <- cr_ppp[cr_win]
 
 set.seed(1234)
-BOOT.spattemp(cr56111_ppp_owin) 
+BOOT.spattemp(cr_ppp_win) 
 ```
-```{r fig.width=14, fig.height=7}
-cr56111_kde <- spattemp.density(cr56111_ppp_owin,
-                             h = 430,
-                             lambda = 5.1)
 
-par(mfcol = c(3, 6), mar = c(2,2,2,4))
-for(i in 1:18){
-  plot(cr56111_kde, i,
-       override.par = FALSE, fix.range = TRUE,
-       main = labels_ym[i])
+```{r}
+h_spat   <- 430
+lambda_t <- 5.1
+
+
+m_vec    <- if (is.data.frame(marks(cr_ppp))) marks(cr_ppp)[[1]] else as.integer(marks(cr_ppp))
+t_range  <- range(m_vec, na.rm = TRUE)
+
+tab_m        <- tabulate(m_vec, nbins = 18)
+first_nonemp <- which(tab_m > 0)[1]
+
+st_first <- spattemp.density(
+  cr_ppp[m_vec == first_nonemp],
+  h      = h_spat,
+  lambda = lambda_t,
+  tlim   = t_range
+)
+
+im_first   <- st_first$spatial
+r_template <- rast(im_first) |> mask(vect(mpsz_cr))
+
+r_list <- vector("list", 18)
+
+for (i in 1:18) {
+  if (any(m_vec == i)) {
+    st_i <- spattemp.density(
+      cr_ppp[m_vec == i],
+      h      = h_spat,
+      lambda = lambda_t,
+      tlim   = t_range
+    )
+    im_i <- st_i$spatial
+    r_i  <- rast(im_i)
+  } else {
+    r_i <- r_template
+    values(r_i) <- 0
+  }
+  
+  r_i <- resample(r_i, r_template, method = "bilinear") |>
+         mask(vect(mpsz_cr))
+  
+  names(r_i) <- paste0("Month_", sprintf("%02d", i))
+  r_list[[i]] <- r_i
 }
+
+kde_stack <- do.call(c, r_list)
+crs(kde_stack) <- st_crs(mpsz_cr)$wkt
+
+
+rng <- range(values(kde_stack), na.rm = TRUE)
+tmap_mode("plot")
+
+map_facets <-
+  tm_shape(kde_stack) +
+    tm_raster(
+      col.scale  = tm_scale_continuous(values = "viridis", limits = rng),
+      col.legend = tm_legend(show = FALSE)
+    ) +
+    tm_borders(col = "grey40", lwd = 0.4) +
+    tm_facets(nrow = 3, ncol = 6, free.coords = FALSE, drop.units = TRUE) +
+    tm_layout(main.title = "Monthly KDE of Analysis of Restaurants and Cafés – Central Region")
+
+legend_panel <-
+  tm_shape(kde_stack[[1]]) +
+    tm_raster(
+      col.scale  = tm_scale_continuous(values = "viridis", limits = rng),
+      col.legend = tm_legend(title = "Density values")
+    ) +
+    tm_layout(legend.only = TRUE)
+
+tmap_arrange(map_facets, legend_panel, ncol = 2, widths = c(6, 1))
 ```
 
-The spatio-temporal KDE of Restaurants and Cafés in the Central Region (Jan 2024–Jun 2025) shows persistent clustering in urban hubs, driven by demand from office workers, tourists, and residents. Hotspots intensified in mid-to-late 2024, reflecting expansion in the food and beverage sector, before stabilising in 2025. Peripheral subzones saw little growth, underscoring a strong preference for high-footfall central locations. Overall, restaurants and cafés consistently open near existing clusters, reinforcing centralisation and competition. Temporal surges reflect favourable business cycles, highlighting how demand-driven expansion continues to shape Singapore’s urban dining landscape while leaving suburban areas relatively underserved.
+The monthly KDE plots for Restaurants and Cafés in the Central Region show clear and persistent clustering across the 18 months. The hotspots remain concentrated in central, high-demand areas, with intensity strengthening during several months in mid-to-late 2024, visible in brighter density patches. By early 2025, these patterns stabilise, indicating consolidation rather than continued rapid expansion. Peripheral areas remain consistently low in density, suggesting limited activity outside key urban hubs. The clustering near established centres reflects a strong centralisation effect, where new outlets tend to locate close to existing ones to leverage high customer flows from offices, retail malls, and tourist zones. 
+
+The temporal changes reflect bursts of business growth cycles rather than shifts in location, supporting the interpretation that the Central Region dominates Singapore’s restaurant and café landscape, with suburban zones playing only a minor role.
 
 ##### K-function
 
@@ -2024,11 +2020,9 @@ plotK(cr56111_stik)
 
 The plot shows high contour values at short spatial and temporal distances, indicating strong clustering of restaurants and cafés close together in both space and time. As distance and time increase, the contours flatten, suggesting weaker clustering or more random patterns. This means establishments tend to open near existing ones within similar periods, reinforcing central hotspots as key business clusters.
 
-
 # 7 Analysis of Event/Concert Organisers
 
 ::: panel-tabset
-
 ## Choropleth Map
 
 ```{r}
@@ -2081,8 +2075,7 @@ outlier_zones_sorted <- outlier_sf %>%
 # List
 print(outlier_zones_sorted)
 ```
-
-::: 
+:::
 
 The choropleth map shows the distribution of event and concert organisers across Singapore’s subzones. Most areas record only a few establishments, typically between 1 and 5, as indicated by the lighter shades of orange.
 
@@ -2160,7 +2153,7 @@ tm_shape(kde_82303_bw_terra) +
 
 The KDE map of event and concert organisers shows a clustered but more dispersed pattern across Singapore. The most intense hotspot is located in the central-southern region, reflecting the presence of major entertainment venues, convention centres, and business districts. Additional moderate clusters can be observed in the eastern and northern areas, suggesting smaller hubs of activity where regional facilities or community venues support event services. In contrast, the western areas show relatively low density, indicating fewer organisers and limited coverage in those zones.
 
-Overall, event and concert organisers are unevenly distributed, with clear concentration in city centres where large-scale events and performances are most viable. The presence of smaller clusters across other regions indicates secondary hubs of activity, but many suburban and peripheral areas remain underrepresented. 
+Overall, event and concert organisers are unevenly distributed, with clear concentration in city centres where large-scale events and performances are most viable. The presence of smaller clusters across other regions indicates secondary hubs of activity, but many suburban and peripheral areas remain underrepresented.
 
 ## 7.2 Regional analysis - Central Region
 
@@ -2181,41 +2174,9 @@ The map shows the distribution of event and concert organisers in the Central Re
 
 ### 7.2.1 Central Region Second-order Spatial Point Patterns Analysis
 
-#### 7.2.1.1 Second-order Spatial Point Patterns Analysis 
+#### 7.2.1.1 Second-order Spatial Point Patterns Analysis
 
-##### Function estimation 
-
-```{r fig.width=10, fig.height=8}
-set.seed(1234)
-
-par(mfrow = c(2, 2))
-
-# G-function
-G_82303_cr <- Gest(biz82303_cr_ppp, correction = "border")
-plot(G_82303_cr,
-     main = "G-function (Event/Concert Organisers in Central Region)")
-
-# F-function
-F_82303_cr <- Fest(biz82303_cr_ppp)
-plot(F_82303_cr,
-     main = "F-function (Event/Concert Organisers in Central Region)")
-
-# K-function
-K_82303_cr <- Kest(biz82303_cr_ppp, correction = "Ripley")
-plot(K_82303_cr, . - r ~ r,
-     ylab = "K(d) - r", xlab = "d (m)",
-     main = "K-function (Event/Concert Organisers in Central Region)")
-
-# L-function
-L_82303_cr <- Lest(biz82303_cr_ppp, correction = "Ripley")
-plot(L_82303_cr, . - r ~ r,
-     ylab = "L(d) - r", xlab = "d (m)",
-     main = "L-function (Event/Concert Organisers in Central Region)")
-```
-
-##### Complete Spatial Randomness Test
-
-To confirm the observed spatial patterns above, a hypothesis test will be conducted. The hypothesis and test are as follows:
+For complete spatial randomness test, the hypothesis and test are as follows:
 
 Ho = The distribution of Event/Concert Organisers in Central Region are randomly distributed.
 
@@ -2223,45 +2184,17 @@ H1= The distribution of Event/Concert Organisers in Central Region are not rando
 
 The null hypothesis will be rejected if p-value is smaller than alpha value of 0.001.
 
-```{r fig.width=10, fig.height=8}
-par(mfrow = c(2, 2))
-
-# G-function
-G_82303_cr.csr <- envelope(biz82303_cr_ppp, Gest, nsim = 999)
-plot(G_82303_cr.csr,
-     main = "G-function (Event/Concert Organisers in Central Region)",
-     xlab = "r", ylab = "G(r)")
-
-# F-function
-F_82303_cr.csr <- envelope(biz82303_cr_ppp, Fest, nsim = 999)
-plot(F_82303_cr.csr,
-     main = "F-function (Event/Concert Organisers in Central Region)",
-     xlab = "r", ylab = "F(r)")
-
-# K-function
-K_82303_cr.csr <- envelope(biz82303_cr_ppp, Kest,
-                        nsim = 99, rank = 1, glocal = TRUE)
-plot(K_82303_cr.csr, . - r ~ r,
-     main = "K-function (Event/Concert Organisers in Central Region)",
-     xlab = "d (m)", ylab = "K(d) - r")
-
-# L-function
+```{r}
 L_82303_cr.csr <- envelope(biz82303_cr_ppp, Lest,
                         nsim = 99, rank = 1, glocal = TRUE)
 plot(L_82303_cr.csr, . - r ~ r,
      main = "L-function (Event/Concert Organisers in Central Region)",
-     xlab = "d (m)", ylab = "L(d) - r")
+     xlab = "d (m)", ylab = "L(d) - r", xlim=c(0,1000))
 ```
 
-The G-function rises steeply above the theoretical expectation, indicating many organisers are located very close to each other. 
+The L-function plot for Event/Concert Organisers in the Central Region indicates strong clustering at short distances. The observed curve (black line) rises sharply above the theoretical expectation (red dashed line) almost immediately from distances near 0, clearly surpassing the simulation envelope. This suggests that clustering begins at very small scales, around 50–100 metres, where organisers are tightly concentrated. The curve continues to remain well above the expected line across the full range up to 1,000 metres, confirming persistent clustering beyond local neighbourhoods. The sharp early rise reflects the tendency of organisers to locate close to one another, likely to benefit from shared infrastructure, accessibility, and audience catchment in central urban areas. 
 
-The F-function also lies above the random distribution, showing that random points are nearer to organisers than expected. 
-
-The K-function consistently exceeds the theoretical curve, reflecting higher densities of organisers within various distances. 
-
-Similarly, the L-function is well above the baseline, especially between 500 and 2000 metres, confirming clustering across medium spatial scales.
-
-Since the observed functions deviate significantly from the theoretical random distribution and fall outside the simulation envelope, the results demonstrate strong spatial clustering. Therefore, the null hypothesis is rejected.
+Since the observed values consistently exceed the simulation envelope, the null hypothesis of complete spatial randomness is rejected. This confirms that event/concert organisers in the Central Region exhibit strong non-random spatial clustering across multiple distance scales.
 
 #### 7.2.1.2 Spatio-Temporal Point Patterns Analysis
 
@@ -2286,7 +2219,7 @@ biz_82303_cr <- biz_82303_sf %>%
 
 if (nrow(biz_82303_cr) == 0) {
   biz_82303_cr <- biz_82303_sf %>%
-    st_buffer(0.5) %>%                                    # ~0.5 m in EPSG:3414
+    st_buffer(0.5) %>%                            
     st_join(mpsz_cr %>% select(REGION_N),
             join = st_intersects, left = FALSE)
 }
@@ -2320,39 +2253,107 @@ The spatio-temporal distribution of event and concert organisers in Singapore’
 ##### STKDE by Month
 
 ```{r}
-months_seq <- seq(as.Date("2024-01-01"), as.Date("2025-06-01"), by = "1 month")
-labels_ym  <- format(months_seq, "%b %Y")
+start_date <- as.Date("2024-01-01")
+end_date   <- as.Date("2025-06-30")
 
-biz_82303_cr_18 <- biz_82303_cr %>%
-  filter(date >= as.Date("2024-01-01"), date <= as.Date("2025-06-30")) %>%
-  mutate(t_index = match(format(date, "%Y-%m"), format(months_seq, "%Y-%m"))) %>%
-  filter(!is.na(t_index)) %>%
-  select(t_index) 
+biz_82303_cr18 <- biz_82303_cr %>%
+  filter(date >= start_date, date <= end_date) %>%
+  mutate(MonthIndex = (year(date) - 2024) * 12 + month(date)) %>%  
+  mutate(MonthIndex = MonthIndex - (min(MonthIndex) - 1))           
 
-cr82303_ppp  <- as.ppp(biz_82303_cr_18) %>% 
-  rjitter(retry = TRUE, nsim = 1, drop = TRUE)
+stopifnot(all(range(biz_82303_cr18$MonthIndex) == c(1, 18)))
 
-cr_owin  <- as.owin(mpsz_cr)
-cr82303_ppp_owin <- cr82303_ppp[cr_owin]
+cr_win  <- as.owin(mpsz_cr)
+xy      <- st_coordinates(biz_82303_cr18)
+
+cr_ppp <- ppp(
+  x = xy[,1], y = xy[,2],
+  window = cr_win,
+  marks  = data.frame(m = biz_82303_cr18$MonthIndex)  
+)
+
+
+cr_ppp <- rjitter(cr_ppp, retry = TRUE, nsim = 1, drop = TRUE)
+cr_ppp_win <- cr_ppp[cr_win]
 
 set.seed(1234)
-BOOT.spattemp(cr82303_ppp_owin) 
+BOOT.spattemp(cr_ppp_win) 
 ```
 
-```{r fig.width=14, fig.height=7}
-cr82303_kde <- spattemp.density(cr82303_ppp_owin,
-                             h = 700,
-                             lambda = 6)
+```{r}
+h_spat   <- 700
+lambda_t <- 6
 
-par(mfcol = c(3, 6), mar = c(2,2,2,4))
-for(i in 1:18){
-  plot(cr82303_kde, i,
-       override.par = FALSE, fix.range = TRUE,
-       main = labels_ym[i])
+
+m_vec    <- if (is.data.frame(marks(cr_ppp))) marks(cr_ppp)[[1]] else as.integer(marks(cr_ppp))
+t_range  <- range(m_vec, na.rm = TRUE)
+
+tab_m        <- tabulate(m_vec, nbins = 18)
+first_nonemp <- which(tab_m > 0)[1]
+
+st_first <- spattemp.density(
+  cr_ppp[m_vec == first_nonemp],
+  h      = h_spat,
+  lambda = lambda_t,
+  tlim   = t_range
+)
+
+im_first   <- st_first$spatial
+r_template <- rast(im_first) |> mask(vect(mpsz_cr))
+
+r_list <- vector("list", 18)
+
+for (i in 1:18) {
+  if (any(m_vec == i)) {
+    st_i <- spattemp.density(
+      cr_ppp[m_vec == i],
+      h      = h_spat,
+      lambda = lambda_t,
+      tlim   = t_range
+    )
+    im_i <- st_i$spatial
+    r_i  <- rast(im_i)
+  } else {
+    r_i <- r_template
+    values(r_i) <- 0
+  }
+  
+  r_i <- resample(r_i, r_template, method = "bilinear") |>
+         mask(vect(mpsz_cr))
+  
+  names(r_i) <- paste0("Month_", sprintf("%02d", i))
+  r_list[[i]] <- r_i
 }
+
+kde_stack <- do.call(c, r_list)
+crs(kde_stack) <- st_crs(mpsz_cr)$wkt
+
+
+rng <- range(values(kde_stack), na.rm = TRUE)
+tmap_mode("plot")
+
+map_facets <-
+  tm_shape(kde_stack) +
+    tm_raster(
+      col.scale  = tm_scale_continuous(values = "viridis", limits = rng),
+      col.legend = tm_legend(show = FALSE)
+    ) +
+    tm_borders(col = "grey40", lwd = 0.4) +
+    tm_facets(nrow = 3, ncol = 6, free.coords = FALSE, drop.units = TRUE) +
+    tm_layout(main.title = "Monthly KDE of Event/Concert Organisers – Central Region")
+
+legend_panel <-
+  tm_shape(kde_stack[[1]]) +
+    tm_raster(
+      col.scale  = tm_scale_continuous(values = "viridis", limits = rng),
+      col.legend = tm_legend(title = "Density values")
+    ) +
+    tm_layout(legend.only = TRUE)
+
+tmap_arrange(map_facets, legend_panel, ncol = 2, widths = c(6, 1))
 ```
 
-The spatio-temporal KDE of event and concert organisers (Jan 2024–Jun 2025) reveals persistent clustering in central subzones, with hotspots consistently stable across months. High-density activity intensifies in mid-2024 and early 2025, likely linked to seasonal peaks in event demand. Despite minor monthly variations, the pattern shows limited dispersion, as organisers concentrate in established zones with strong infrastructure and audience access. Peripheral areas remain largely inactive, underscoring a centralised growth trend. Overall, the KDE highlights how central subzones dominate the sector, with new businesses reinforcing existing hotspots and sustaining Singapore’s core event and entertainment hubs.
+The plots clearly show persistent clustering of event and concert organisers in the Central Region, with stable hotspots across the 18 months from Jan 2024 to Jun 2025. The density strengthens around mid-2024 and again in early 2025, which could reflect seasonal peaks or bursts of new registrations. While minor fluctuations appear month to month, the spatial pattern remains concentrated in well-established central locations. Peripheral parts of the region stay largely inactive, indicating that organisers continue to prefer high-accessibility, high-demand central hubs. This reinforces the idea that new entrants tend to cluster near existing hotspots, further consolidating the Central Region as the dominant entertainment and events hub in Singapore.
 
 ##### K-function
 
@@ -2372,26 +2373,22 @@ plotK(cr82303_stik)
 
 The plot shows strong clustering of Event/Concert Organisers at short spatial and temporal distances, meaning businesses tend to form close to each other in both location and time. As distance increases, clustering weakens, indicating limited spread across wider areas or longer periods. Overall, the pattern reflects concentrated hotspots rather than random or evenly distributed growth.
 
-
 # 8 Conclusion
 
-1) Zoning & floorspace strategy
-The CSR tests and KDE maps show strong clustering for Restaurants/Cafés and Retail Clothing, especially in the Central Region (e.g., Chinatown, Lavender, Geylang East, Cecil). Safeguard and intensify commercial/F&B floorspace in these proven hotspots via mixed-use zoning, higher plot ratios, and permissive active-frontage uses at ground level. Designate “comparison-retail” corridors in regional hubs (e.g., Woodlands East, Tampines East) where retail clusters already emerge. For Fitness Centres—dispersed but concentrated in residential towns—permit gyms as ancillary uses in HDB/commercial blocks and community facilities to underpin a 15-minute city.
+1. Reinforce mixed-use, transit-oriented hubs:
+Clustering of restaurants/cafés and adult apparel at sub-100 m to ~1 km scales, with monthly intensity peaks, confirms strong agglomeration around MRT nodes, malls, and high-footfall streets. Planning should safeguard flexible ground/mezzanine GFA for F&B, retail, and small venues within 400–800 m of stations, require active frontages, and deliver weather-protected pedestrian links that stitch malls, street dining, and venue entries into one coherent, walkable circuit.
 
-2) Location guidance & development management
-Outlier subzones flag both saturation risks and growth opportunities. In very dense F&B/event streets, apply frontage caps, stack exhaust/noise controls, and queue/servicing management; steer additional applicants to adjacent streets with capacity to prevent amenity conflicts. In cold spots, use time-limited pilots (pop-ups, white sites) to test demand before permanent rezoning. This channels growth while protecting liveability.
+2. Close daily-needs gaps for fitness:
+Fitness centres cluster in central/eastern subzones while peripheral towns remain underserved. To advance 15-minute living and health equity, allocate small-format commercial units for gyms/physio in HDB town centres and neighborhood hubs, co-locate with ActiveSG facilities and park connectors, and pilot fit-out grants or stepped rents where supply is thin. These moves reduce travel frictions, spread activity beyond the core, and support off-peak, localised trip-chaining after work or school.
 
-3) Mobility & servicing
-Hotspots cluster around MRT interchanges and city cores; strengthen last-mile access: sheltered links, lighting, barrier-free routes, bicycle parking, and off-street loading/coach lay-bys. Around event nodes, pre-plan logistics zones (barricade anchors, sound buffers, dispersal routes) to reduce spillover onto neighbourhood streets.
+3. Manage event externalities, spread benefits:
+Event/concert organisers concentrate in central districts to leverage infrastructure and audiences, creating periodic pressure on streets, noise environments, and last-mile transit. Embed queueing pockets, loading bays, acoustic buffers, and night-time management plans in development control; align bus/train headways to seasonal peaks observed in ST-KDE. In parallel, designate secondary culture nodes in regional centres with permissive temporary-use policies so smaller happenings decentralise without diluting signature CBD anchors.
 
-4) Equity, health & everyday access
-Spatial gaps—especially in peripheral/western areas for gyms and F&B—indicate under-served populations. Bake fitness rooms, affordable eateries, and daily-needs retail into town-centre upgrades, sports hubs, and new community facilities. Reserve a share of units through planning conditions or public leasing to secure price-accessible offers near homes and schools, supporting active ageing and after-school trips.
+4. Sequence retail/F&B supply to avoid monocultures:
+L-function results show tight co-location benefits but risk overshoot and rent spirals. Use phased release of retail/F&B GFA, frontage diversity guidelines (caps on identical uses per block), and curated street mixes to maintain resilience. Encourage upper-storey white-site flexibility so space can pivot between boutique retail, studios, or small venues as cycles shift, sustaining day-to-night activation without saturating any single category.
 
-5) Economic resilience & tenancy mix
-Temporal trends (Jan 2024–Jun 2025) show Restaurants and Cafés expanding fastest, retail clothing stable, events moderating, and gyms fluctuating. Support should match sector needs: flexible licences and incubator kitchens for F&B, longer leases for anchor retail, adaptable spaces for gyms, and streamlined permits for event organisers. Such measures stabilise tenancy, cushion small operators from volatility, and keep urban centres resilient and responsive to shifting consumer habits.
+5. Design streets for the whole “lifestyle chain”:
+Since people often exercise, shop, dine, and gather in one trip, public realm design should make those sequences seamless. Prioritise wider sidewalks, shade, at-grade crossings, end-of-trip cycling facilities near gyms and malls, and wayfinding that links MRT exits to F&B streets and venues. Pocket plazas and micro-event spaces at block corners can absorb peaks, reduce conflicts, and keep footfall circulating within the district rather than spilling into carriageways.
 
-6) Evidence-led triggers & monitoring
-Institutionalise annual re-runs of G/F/K/L functions and KDE by region. Tie quantitative thresholds to actions—for example, pause new F&B approvals when K exceeds a set benchmark within 800 m of saturated streets; activate incentives where densities fall below target in new towns. Publish a simple dashboard so residents and entrepreneurs can see hotspot/cold-spot status and pipeline capacity, aligning with transparent, data-driven governance.
-
-
-Use clustering to reinforce proven commercial cores, gap analysis to rebalance access in heartlands, and time-series trends to right-size controls and support. This keeps neighbourhoods lively yet liveable, aligns supply with transit and demand, and builds a resilient, 15-minute urban economy.
+6. Operationalise monitoring with your spatio-temporal signals:
+Turn monthly KDE stacks and hotspot persistence into KPIs per subzone (e.g., three-month intensity rise, amenity threshold gaps). Use thresholds to trigger interventions: pedestrian-realm upgrades and transit boosts where clusters intensify; incentives and safeguarded units where daily-needs amenities lag. A light-touch, data-driven loop lets URA/landlords fine-tune space, streets, and service levels so central hubs are reinforced, regional nodes mature, and everyday city life stays convenient, vibrant, and inclusive.
