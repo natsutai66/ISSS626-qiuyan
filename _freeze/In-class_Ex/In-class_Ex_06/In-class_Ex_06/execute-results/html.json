@@ -1,0 +1,15 @@
+{
+  "hash": "593875aa87a755fd18e0b6e3ebd6437b",
+  "result": {
+    "engine": "knitr",
+    "markdown": "---\ntitle: \"In class exercise 6\"\nauthor: \"Tai Qiu Yan\"\ndate: \"October 4, 2025\"\ndate-modified: \"last-modified\"\nexecute: \n  eval: true\n  echo: true\n  warning: false\n  freeze: true\n---\n\n# Take Home Exercise 2 Kick Starter\n\n## Loading the R package\n\n\n::: {.cell}\n\n```{.r .cell-code}\npacman::p_load(tidyverse, sf, sfdep, tmap, knitr)\n```\n:::\n\n\n## Importing Data\n\n\n::: {.cell}\n\n```{.r .cell-code}\n# mpsz = read_rds(\"data/rds/mpsz_sf.rds\")\n\nBusStop = st_read(dsn = \"data/LTADataMall/\",\n                  layer = \"BusStop\")\n```\n\n::: {.cell-output .cell-output-stdout}\n\n```\nReading layer `BusStop' from data source \n  `C:\\Users\\tqy87\\OneDrive\\Documents\\natsutai66\\ISSS626-qiuyan\\In-class_Ex\\In-class_Ex_06\\data\\LTADataMall' \n  using driver `ESRI Shapefile'\nSimple feature collection with 5172 features and 2 fields\nGeometry type: POINT\nDimension:     XY\nBounding box:  xmin: 3970.122 ymin: 26482.1 xmax: 48285.52 ymax: 52983.82\nProjected CRS: SVY21\n```\n\n\n:::\n\n```{.r .cell-code}\nodbus <- read_csv(\"data/LTADataMall/origin_destination_bus_202508.csv\")\n```\n:::\n\n\n## ",
+    "supporting": [],
+    "filters": [
+      "rmarkdown/pagebreak.lua"
+    ],
+    "includes": {},
+    "engineDependencies": {},
+    "preserve": {},
+    "postProcess": true
+  }
+}
