@@ -40,6 +40,7 @@ BusStop = st_read(dsn = "data/LTADataMall/",
 
 odbus <- read_csv("data/LTADataMall/origin_destination_bus_202508.csv")
 ```
+
 ## Extracting Bus Stops within Singapore
 
 ```{r}
