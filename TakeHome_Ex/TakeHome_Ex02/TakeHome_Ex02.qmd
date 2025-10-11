@@ -1,5 +1,547 @@
 ---
-title: "TakeHome_Ex02"
-format: html
+title: "Take home exercise 2"
+author: "Tai Qiu Yan"
+date: "October 8, 2025"
+date-modified: "last-modified"
+execute: 
+  eval: true
+  echo: true
+  warning: false
+  freeze: true
 ---
 
+# 1 Introduction
+
+# 2 Loading the R package
+
+```{r}
+pacman::p_load(tidyverse, sf, sfdep, tmap, knitr, kableExtra, DT)
+```
+
+# 3 Data Importing and Wrangling
+
+## Importing Data
+
+```{r}
+#Bus Stop Location
+BusStop = st_read(dsn = "data/LTADataMall/", 
+                  layer = "BusStop") %>%
+  st_transform(crs = 3414)
+
+#Master Plan 2019 Subzone
+mpsz = read_rds("data/rds/mpsz_sf.rds")
+
+#O-D Bus Trips
+odbus <- read_csv("data/LTADataMall/origin_destination_bus_202508.csv")
+```
+
+## Extracting Bus Stops located within Singapore
+
+```{r}
+BusStop_in_SG <- st_join(
+  BusStop, mpsz, 
+  join = st_within, 
+  left = FALSE)
+```
+
+### Visualize
+
+```{r}
+tm_shape(mpsz) +
+  tm_polygons() +
+tm_shape(BusStop_in_SG) +
+  tm_dots()
+```
+
+## Deriving Analytical Hexagon
+
+```{r}
+hexagon <- st_make_grid(mpsz, 
+                        cellsize = 700,
+                        what = "polygon",
+                        square = FALSE) %>%
+  st_sf()
+```
+
+## Selecting hexagons with bus stops
+
+```{r}
+hexagon$busstop_count =
+  lengths(st_intersects(
+    hexagon, BusStop_in_SG))
+
+hexagon <- filter(
+  hexagon, busstop_count > 0)
+```
+
+## Assigning ids to each hexagon
+
+```{r}
+hexagon <- hexagon %>% 
+  select(, -busstop_count)
+
+hexagon$HEX_ID <- sprintf(
+  "H%04d", seq_len(
+    nrow(hexagon))) %>% 
+  as.factor()
+```
+
+## Preparing Trip Generation Data
+
+```{r}
+trips <- odbus %>%
+  select(c(ORIGIN_PT_CODE, DAY_TYPE, TIME_PER_HOUR, TOTAL_TRIPS)) %>%
+  rename(BUS_STOP_N = ORIGIN_PT_CODE) %>%
+  rename(HOUR_OF_DAY = TIME_PER_HOUR) %>%
+  rename(TRIPS = TOTAL_TRIPS)
+trips$BUS_STOP_N <- as.factor(trips$BUS_STOP_N)
+```
+
+## Populating Hexagon IDs into BusStop data frame
+
+```{r}
+bs_hex <- st_intersection(
+  BusStop, hexagon) %>%
+  st_drop_geometry() %>%
+  select(c(BUS_STOP_N, HEX_ID))
+```
+
+## Adding HEX_ID into bus trips data
+
+```{r}
+trips <- inner_join(trips, bs_hex)
+```
+
+## Aggregating TRIPS based on HEX_ID
+
+```{r}
+trips <- trips %>%
+  group_by(
+    HEX_ID,
+    DAY_TYPE,
+    HOUR_OF_DAY) %>%
+  summarise(TRIPS = sum(TRIPS))
+```
+
+# 4 Weekday morning peak
+
+## 4.1 Overview
+
+### Choropleth map of total trips
+
+```{r}
+weekday_morning <- trips %>%
+  filter(DAY_TYPE == "WEEKDAY", HOUR_OF_DAY %in% 6:8) %>%
+  group_by(HEX_ID) %>%
+  summarise(TRIPS = sum(TRIPS), .groups = "drop") %>%
+  left_join(hexagon, by = "HEX_ID") %>%
+  st_as_sf()
+
+tmap_mode("plot")
+
+tm_shape(mpsz) +
+  tm_polygons(col = "grey90", border.col = "white") +
+  
+  tm_shape(weekday_morning) +
+  tm_polygons(
+    fill = "TRIPS",
+    fill.scale = tm_scale_intervals(
+      style = "quantile",  # Use style = "quantile" instead
+      n = 5,
+      values = "viridis"
+    ),
+    fill.legend = tm_legend(
+      title = "Total Trips\n(Weekday Morning)",
+      position = tm_pos_in("right", "bottom")
+    )
+  ) +
+  tm_borders(col = "grey40", lwd = 0.5) +
+  tm_title("Distribution of Bus Trips - Weekday Morning Peak (6am-9am)") +
+  tm_compass(position = tm_pos_in("left", "top")) +
+  tm_scale_bar(position = tm_pos_in("left", "bottom"))
+```
+
+### Trip Distribution
+
+```{r}
+# Understanding the distribution of trips with improved formatting
+library(scales)
+
+# Calculate statistics
+mean_trips <- mean(weekday_morning$TRIPS)
+median_trips <- median(weekday_morning$TRIPS)
+q75 <- quantile(weekday_morning$TRIPS, 0.75)
+q95 <- quantile(weekday_morning$TRIPS, 0.95)
+
+# Create improved histogram
+ggplot(weekday_morning, aes(x = TRIPS)) +
+  geom_histogram(bins = 50, fill = "steelblue", color = "white", alpha = 0.8) +
+  geom_vline(aes(xintercept = mean_trips), 
+             color = "red", linetype = "dashed", size = 1) +
+  geom_vline(aes(xintercept = median_trips), 
+             color = "orange", linetype = "dashed", size = 1) +
+  # Add text labels for mean and median
+  annotate("text", x = mean_trips, y = Inf, 
+           label = paste0("Mean: ", round(mean_trips, 0)), 
+           vjust = 2, hjust = -0.1, color = "red", size = 3.5) +
+  annotate("text", x = median_trips, y = Inf, 
+           label = paste0("Median: ", round(median_trips, 0)), 
+           vjust = 4, hjust = -0.1, color = "orange", size = 3.5) +
+  # Format x-axis with comma separators
+  scale_x_continuous(
+    labels = label_number(scale = 1/1000, suffix = "k"),
+    breaks = seq(0, max(weekday_morning$TRIPS), by = 20000)
+  ) +
+  scale_y_continuous(labels = comma) +
+  labs(
+    title = "Distribution of Trip Counts - Weekday Morning Peak (6am-9am)",
+    subtitle = paste0("n = ", nrow(weekday_morning), " hexagons | 95th percentile: ", 
+                     round(q95, 0), " trips"),
+    x = "Number of Trips",
+    y = "Frequency (Number of Hexagons)") +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", size = 14),
+    plot.subtitle = element_text(size = 10, color = "gray40"),
+    axis.title = element_text(size = 11),
+    panel.grid.minor = element_blank()
+  )
+```
+
+## 4.2 Local Indicators of Spatial Association(LISA)
+
+```{r}
+# Build spatial weights (Queen contiguity)
+nb <- st_contiguity(weekday_morning)
+wt <- st_weights(nb, style = "W", allow_zero = TRUE)
+
+# Compute Local Moran's I
+set.seed(1234)
+lisa_morning <- weekday_morning %>%
+  mutate(local_moran = local_moran(
+    TRIPS, nb, wt, nsim = 99
+  ), .before = 1) %>%
+  unnest(local_moran)
+
+# Result
+glimpse(lisa_morning)
+```
+
+### Local Moran’s I values and p-values
+
+```{r}
+ii_map <- tm_shape(mpsz) +
+  tm_polygons(col = "grey90", border.col = "white") +  # base layer
+
+  tm_shape(lisa_morning) +
+  tm_polygons(fill = "ii",
+              fill.scale = tm_scale_intervals(
+                style = "pretty",
+                n = 5,
+                values = "brewer.RdBu"
+              ),
+              fill.legend = tm_legend(
+                title = "Local Moran's I",
+                position = tm_pos_in("right", "bottom")
+              )
+  ) +
+  tm_borders(col = "grey40", lwd = 0.5) +
+  tm_title("Local Moran's I - morning peak")
+
+p_ii_map <- tm_shape(mpsz) +
+  tm_polygons(col = "grey90", border.col = "white") +
+
+  tm_shape(lisa_morning) +
+  tm_polygons(fill = "p_ii",
+              fill.scale = tm_scale_intervals(
+                breaks = c(-Inf, 0.001, 0.01, 0.05, 0.1, Inf),
+                values = "-brewer.Reds"
+              ),
+              fill.legend = tm_legend(
+                title = "p-value",
+                position = tm_pos_in("right", "bottom")
+              )
+  ) +
+  tm_borders(col = "grey40", lwd = 0.5) +
+  tm_title("p-values of Local Moran's I")
+
+tmap_arrange(ii_map, p_ii_map, asp = 1, ncol = 2)
+```
+
+### Moran scatterplot with standardised variable
+
+```{r}
+lisa_morning <- lisa_morning %>%
+  mutate(lag_TRIPS = st_lag(
+    TRIPS, nb, wt),
+    .before = 1) %>%
+  unnest(lag_TRIPS)
+
+lisa_morning <- lisa_morning %>%
+  mutate(z_TRIPS = scale(TRIPS),
+         z_lag_TRIPS = scale(lag_TRIPS),
+         .before = 1)
+
+ggplot(data = lisa_morning,
+       aes(x = z_TRIPS,
+           y = z_lag_TRIPS,
+           color = mean)) +
+  geom_point(size = 2) +
+  geom_smooth(method = "lm",
+              se = FALSE,
+              color = "black") +
+  geom_hline(yintercept = mean(lisa_morning$z_lag_TRIPS), lty = 2) +
+  geom_vline(xintercept = mean(lisa_morning$z_TRIPS), lty = 2) +
+  scale_color_manual(
+    values = c("High-High" = "red",
+               "Low-Low" = "blue",
+               "Low-High" = "lightblue",
+               "High-Low" = "pink")) +
+  labs(x = "Standardised TRIPS",
+       y = "Standardised Spatial Lag of TRIPS",
+       title = "Standardised Moran Scatterplot with LISA Quadrants") +
+  theme_minimal()
+```
+
+
+### LISA Map
+
+```{r}
+lisa_sig <- lisa_morning %>%
+  filter(p_ii < 0.05)
+
+tmap_mode("plot")
+
+tm_shape(mpsz) +
+  tm_polygons(col = "grey90", border.col = "white") +
+  
+  tm_shape(lisa_morning) +
+  tm_polygons(fill = "TRIPS",
+              fill.scale = tm_scale_continuous(
+                values = "greys"
+              ),
+              fill.legend = tm_legend(
+                title = "Total TRIPS",
+                position = tm_pos_in("right", "bottom")
+              )
+  ) +
+  tm_borders(col = "grey40", lwd = 0.5) +
+  
+  tm_shape(lisa_sig) +
+  tm_polygons(fill = "mean",
+              fill.scale = tm_scale_categorical(
+                values = c("High-High" = "red",
+                          "Low-Low" = "blue",
+                          "Low-High" = "lightblue",
+                          "High-Low" = "pink")
+              ),
+              fill.legend = tm_legend(
+                title = "LISA Quadrants (p < 0.05)",
+                position = tm_pos_in("left", "bottom")
+              )
+  ) +
+  tm_borders(col = "black", lwd = 0.5) +
+  tm_title("LISA Map - Weekday Morning Peak (6am-9am)")
+```
+
+## 4.3 Hot Spots and Cold Spots Analysis (HCSA)
+
+### Gi* values and p-values
+
+```{r}
+# Compute fixed distance weight matrix
+ct <- critical_threshold(st_geometry(weekday_morning))
+
+weekday_morning_fdw <- weekday_morning %>%
+  mutate(nb = include_self(
+    st_dist_band(
+      st_geometry(geometry),
+      upper = ct)),
+    wt = st_weights(nb,
+                    style = "W"),
+    .before = 1)
+
+# Compute local Gi*
+
+set.seed(1234)
+
+HCSA_fdw <- weekday_morning_fdw %>%
+  mutate(
+    gistar = local_gstar_perm(
+      TRIPS, nb, wt, nsim = 99),
+    .before = 1) %>%
+  unnest(gistar)
+
+# Plot Gi* values
+Gi_star_map <- tm_shape(mpsz) +
+  tm_polygons(col = "grey90", border.col = "white") +
+  
+  tm_shape(HCSA_fdw) +
+  tm_polygons(fill = "gi_star",
+              fill.scale = tm_scale_intervals(
+                style = "pretty",
+                n = 5,
+                values = "-brewer.rd_bu"),
+              fill.legend = tm_legend(
+                title = "local Gi*",
+                position = tm_pos_in(
+                  "right", "bottom"))) +
+  tm_borders(col = "grey40", lwd = 0.5) +
+  tm_title("Local Gi* of TRIPS")
+
+# Plot p-values
+p_values_map <- tm_shape(mpsz) +
+  tm_polygons(col = "grey90", border.col = "white") +
+  
+  tm_shape(HCSA_fdw) +
+  tm_polygons(fill = "p_sim",
+              fill.scale = tm_scale_intervals(
+                breaks = c(0, 0.001, 0.01, 0.05, 0.1, 1),
+                values = "-brewer.reds"),
+              fill.legend = tm_legend(
+                title = "p-value",
+                position = tm_pos_in("right", "bottom"))) +
+  tm_borders(col = "grey40", lwd = 0.5) +
+  tm_title("p-values of local Gi* of TRIPS (Fixed distance)")
+
+# Display both maps side by side
+tmap_arrange(Gi_star_map, p_values_map, asp = 1, ncol = 2)
+```
+
+### HCSA Map
+
+```{r}
+# HCSA cluster classification
+HCSA_fdw <- HCSA_fdw %>%
+  mutate(HCSA_cluster = case_when(
+    p_sim > 0.05 ~ "Insignificant",
+    p_sim <= 0.05 & cluster == "High" ~ "Hot spot",
+    p_sim <= 0.05 & cluster == "Low" ~ "Cold spot",
+    TRUE ~ "Other"),
+    HCSA_cluster = factor(
+      HCSA_cluster,
+      levels = c("Insignificant", "Hot spot", "Cold spot")
+    ),
+    .before = 1
+  )
+
+# Plot HCSA cluster map
+HCSA_map <- tm_shape(mpsz) +
+  tm_polygons(col = "grey90", border.col = "white") +
+  
+  tm_shape(HCSA_fdw) +
+  tm_polygons(
+    fill = "HCSA_cluster",
+    fill.scale = tm_scale_categorical(
+      values = c(
+        "grey80",  # Insignificant
+        "red",     # Hot spot
+        "blue"     # Cold spot
+      )
+    ),
+    fill.legend = tm_legend(
+      title = "HCSA Cluster",
+      position = tm_pos_in("right", "bottom"))
+  ) +
+  tm_borders(col = "grey40", lwd = 0.5) +
+  tm_title("HCSA Clusters (p < 0.05)")
+
+# Gi* map and HCSA map
+tmap_arrange(Gi_star_map, HCSA_map, asp = 1, ncol = 2)
+```
+
+
+
+
+### Emerging Hot Spot Analysis (EHSA)
+
+```{r}
+
+```
+
+
+
+
+
+
+
+# comparasion
+
+```{r}
+# Prepare data for all three periods
+weekday_afternoon <- trips %>%
+  filter(DAY_TYPE == "WEEKDAY", HOUR_OF_DAY %in% 17:19) %>%
+  group_by(HEX_ID) %>%
+  summarise(TRIPS = sum(TRIPS), .groups = "drop") %>%
+  left_join(hexagon, by = "HEX_ID") %>%
+  st_as_sf()
+
+weekend <- trips %>%
+  filter(DAY_TYPE %in% c("WEEKENDS/HOLIDAY"), HOUR_OF_DAY %in% 11:19) %>%
+  group_by(HEX_ID) %>%
+  summarise(TRIPS = sum(TRIPS), .groups = "drop") %>%
+  left_join(hexagon, by = "HEX_ID") %>%
+  st_as_sf()
+
+# Create comparative maps
+morning_map <- tm_shape(mpsz) +
+  tm_polygons(col = "grey90", border.col = "white") +
+  tm_shape(weekday_morning) +
+  tm_polygons(fill = "TRIPS",
+              fill.scale = tm_scale_intervals(
+                style = "quantile",
+                n = 5,
+                values = "viridis"
+              ),
+              fill.legend = tm_legend(title = "Trips")) +
+  tm_borders(col = "grey40", lwd = 0.5) +
+  tm_title("Weekday Morning\n(6am-9am)")
+
+afternoon_map <- tm_shape(mpsz) +
+  tm_polygons(col = "grey90", border.col = "white") +
+  tm_shape(weekday_afternoon) +
+  tm_polygons(fill = "TRIPS",
+              fill.scale = tm_scale_intervals(
+                style = "quantile",
+                n = 5,
+                values = "viridis"
+              ),
+              fill.legend = tm_legend(title = "Trips")) +
+  tm_borders(col = "grey40", lwd = 0.5) +
+  tm_title("Weekday Afternoon\n(5pm-8pm)")
+
+weekend_map <- tm_shape(mpsz) +
+  tm_polygons(col = "grey90", border.col = "white") +
+  tm_shape(weekend) +
+  tm_polygons(fill = "TRIPS",
+              fill.scale = tm_scale_intervals(
+                style = "quantile",
+                n = 5,
+                values = "viridis"
+              ),
+              fill.legend = tm_legend(title = "Trips")) +
+  tm_borders(col = "grey40", lwd = 0.5) +
+  tm_title("Weekend/Holiday\n(11am-8pm)")
+
+tmap_arrange(morning_map, afternoon_map, weekend_map, ncol = 3)
+```
+
+## Boxplot
+
+```{r}
+# Combine all three periods
+all_periods <- bind_rows(
+  weekday_morning %>% st_drop_geometry() %>% mutate(Period = "Morning"),
+  weekday_afternoon %>% st_drop_geometry() %>% mutate(Period = "Afternoon"),
+  weekend %>% st_drop_geometry() %>% mutate(Period = "Weekend")
+)
+
+ggplot(all_periods, aes(x = Period, y = TRIPS, fill = Period)) +
+  geom_boxplot() +
+  scale_fill_viridis_d() +
+  labs(title = "Comparison of Trip Distributions Across Time Periods",
+       y = "Number of Trips",
+       x = "Time Period") +
+  theme_minimal() +
+  theme(legend.position = "none")
+```

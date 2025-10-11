@@ -10,249 +10,152 @@ execute:
   freeze: true
 ---
 
-#Getting Started
+# Getting Started
 
 ## Installing and Loading the R Packages
 
 ```{r}
-pacman::p_load(sf, sfdep, tmap, tidyverse)
+pacman::p_load(sf, sfdep, tmap, 
+               plotly, tidyverse, 
+               Kendall)
 ```
 
 ## The Data
 
 ```{r}
 hunan <- st_read(dsn = "data/geospatial", 
-                 layer = "Hunan")
+                 layer = "Hunan") %>% 
+  st_transform(crs = 32650)
 ```
 
 ## Importing Attribute Table
 
 ```{r}
-hunan2012 <- read_csv("data/aspatial/Hunan_2012.csv")
+GDPPC <- read_csv("data/aspatial/Hunan_GDPPC.csv")
 ```
-
-## Combining both data frame by using left join
+# Creating a Time Series Cube
 
 ```{r}
-hunan_GDPPC <- left_join(hunan, hunan2012) %>%
-  select(1:4, 7, 15)
+GDPPC_st <- spacetime(GDPPC, hunan,
+                      .loc_col = "County",
+                      .time_col = "Year")
 ```
 
-## Plotting a choropleth map
+# Computing Gi*
 
+Deriving the spatial weights:
 ```{r}
-tmap_mode("plot")
-tm_shape(hunan_GDPPC) +
-  tm_fill("GDPPC", 
-          style = "quantile", 
-          palette = "Blues",
-          title = "GDPPC") +
-  tm_layout(main.title = "Distribution of GDP per capita by county, Hunan Province",
-            main.title.position = "center",
-            main.title.size = 1.2,
-            legend.height = 0.45, 
-            legend.width = 0.35,
-            frame = TRUE) +
-  tm_borders(alpha = 0.5) +
-  tm_compass(type="8star", size = 2) +
-  tm_scale_bar() +
-  tm_grid(alpha =0.2)
-```
-
-# Global Measures of Spatial Association
-Step 1: Deriving Queen’s contiguity weights: sfdep methods
-
-```{r}
-wm_q <- hunan_GDPPC %>%
-  mutate(nb = st_contiguity(geometry),
-         wt = st_weights(nb,
-                         style = "W"),
-         .before = 1) 
-```
-
-```{r}
-wm_q
-```
-
-## Computing Global Moran’ I
-
-```{r}
-moranI <- global_moran(wm_q$GDPPC,
-                       wm_q$nb,
-                       wm_q$wt)
-glimpse(moranI)
-```
-
-## Performing Global Moran’sI test
-
-```{r}
-global_moran_test(wm_q$GDPPC,
-                       wm_q$nb,
-                       wm_q$wt)
-```
-
-## Performing Global Moran’I permutation test
-
-```{r}
-set.seed(1234)
-
-global_moran_perm(wm_q$GDPPC,
-                       wm_q$nb,
-                       wm_q$wt,
-                  nsim = 99)
-```
-
-# LISA map
-
-## Computing local Moran’s I
-
-```{r}
-lisa <- wm_q %>% 
-  mutate(local_moran = local_moran(
-    GDPPC, nb, wt, nsim = 99),
-         .before = 1) %>%
-  unnest(local_moran)
-```
-
-## Visualising local Moran’s I
-
-```{r}
-tmap_mode("plot")
-tm_shape(lisa) +
-  tm_fill("ii") + 
-  tm_borders(alpha = 0.5) +
-  tm_view(set.zoom.limits = c(6,8)) +
-  tm_layout(
-    main.title = "local Moran's I of GDPPC",
-    main.title.size = 2)
-```
-
-## Visualising p-value of local Moran’s I
-
-```{r}
-tmap_mode("plot")
-tm_shape(lisa) +
-  tm_fill("p_ii_sim") + 
-  tm_borders(alpha = 0.5) +
-   tm_layout(main.title = "p-value of local Moran's I",
-            main.title.size = 2)
-```
-
-## Visualising local Moran’s I and p-value
-
-```{r}
-tmap_mode("plot")
-map1 <- tm_shape(lisa) +
-  tm_fill("ii") + 
-  tm_borders(alpha = 0.5) +
-  tm_view(set.zoom.limits = c(6,8)) +
-  tm_layout(main.title = "local Moran's I of GDPPC",
-            main.title.size = 0.8)
-
-map2 <- tm_shape(lisa) +
-  tm_fill("p_ii",
-          breaks = c(0, 0.001, 0.01, 0.05, 1),
-              labels = c("0.001", "0.01", "0.05", "Not sig")) + 
-  tm_borders(alpha = 0.5) +
-  tm_layout(main.title = "p-value of local Moran's I",
-            main.title.size = 0.8)
-
-tmap_arrange(map1, map2, ncol = 2)
-```
-
-## Plotting LISA map
-
-```{r}
-lisa_sig <- lisa  %>%
-  filter(p_ii_sim < 0.05)
-tmap_mode("plot")
-tm_shape(lisa) +
-  tm_polygons() +
-  tm_borders(alpha = 0.5) +
-tm_shape(lisa_sig) +
-  tm_fill("mean") + 
-  tm_borders(alpha = 0.4)
-```
-
-# Hot Spot and Cold Spot Area Analysis (HCSA)
-
-##Computing local Gi* statistics
-
-```{r}
-wm_idw <- hunan_GDPPC %>%
+GDPPC_nb <- GDPPC_st %>%
+  activate("geometry") %>%
   mutate(nb = include_self(
     st_contiguity(geometry)),
-    wts = st_inverse_distance(nb, 
-                              geometry, 
-                              scale = 1,
-                              alpha = 1),
-         .before = 1)
-
-HCSA <- wm_idw %>% 
-  mutate(local_Gi = local_gstar_perm(
-    GDPPC, nb, wts, nsim = 99),
-         .before = 1) %>%
-  unnest(local_Gi)
-HCSA
+    wt = st_inverse_distance(nb, 
+                             geometry, 
+                             scale = 1,
+                             alpha = 1),
+    .before = 1) %>%
+  set_nbs("nb") %>%
+  set_wts("wt")
 ```
 
-## Visualising Gi*
-
 ```{r}
-tmap_mode("plot")
-tm_shape(HCSA) +
-  tm_fill("gi_star") + 
-  tm_borders(alpha = 0.5) +
-  tm_view(set.zoom.limits = c(6,8))
+gi_stars <- GDPPC_nb %>% 
+  group_by(Year) %>% 
+  mutate(gi_star = local_gstar_perm(
+    GDPPC, nb, wt)) %>% 
+  tidyr::unnest(gi_star)
 ```
 
-## Visualising p-value of HCSA
+# Mann-Kendall Test
 
+## Mann-Kendall Test on Gi
 ```{r}
-tmap_mode("plot")
-tm_shape(HCSA) +
-  tm_fill("p_sim") + 
-  tm_borders(alpha = 0.5)
+cbg <- gi_stars %>% 
+  ungroup() %>% 
+  filter(County == "Changsha") |> 
+  select(County, Year, gi_star)
+
+ggplot(data = cbg, 
+       aes(x = Year, 
+           y = gi_star)) +
+  geom_line() +
+  theme_light()
 ```
 
-## Visuaising local HCSA
+## Interactive Mann-Kendall Plot
 
 ```{r}
-tmap_mode("plot")
-map1 <- tm_shape(HCSA) +
-  tm_fill("gi_star") + 
-  tm_borders(alpha = 0.5) +
-  tm_view(set.zoom.limits = c(6,8)) +
-  tm_layout(main.title = "Gi* of GDPPC",
-            main.title.size = 0.8)
+p <- ggplot(data = cbg, 
+       aes(x = Year, 
+           y = gi_star)) +
+  geom_line() +
+  theme_light()
 
-map2 <- tm_shape(HCSA) +
-  tm_fill("p_value",
-          breaks = c(0, 0.001, 0.01, 0.05, 1),
-              labels = c("0.001", "0.01", "0.05", "Not sig")) + 
-  tm_borders(alpha = 0.5) +
-  tm_layout(main.title = "p-value of Gi*",
-            main.title.size = 0.8)
-
-tmap_arrange(map1, map2, ncol = 2)
+ggplotly(p)
 ```
 
-## Visualising hot spot and cold spot areas
+## Printing Mann-Kendall test report
 
 ```{r}
-HCSA_sig <- HCSA  %>%
-  filter(p_sim < 0.05)
+cbg %>%
+  summarise(mk = list(
+    unclass(
+      Kendall::MannKendall(gi_star)))) %>% 
+  tidyr::unnest_wider(mk)
+```
+
+## Mann-Kendall test data.frame
+
+```{r}
+ehsa <- gi_stars %>%
+  group_by(County) %>%
+  summarise(mk = list(
+    unclass(
+      Kendall::MannKendall(gi_star)))) %>%
+  tidyr::unnest_wider(mk)
+head(ehsa)
+```
+
+```{r}
+emerging <- ehsa %>% 
+  arrange(sl, abs(tau)) %>% 
+  slice(1:10)
+head(emerging)
+```
+
+# Performing Emerging Hotspot Analysis
+
+```{r}
+ehsa <- emerging_hotspot_analysis(
+  x = GDPPC_st, 
+  .var = "GDPPC", 
+  k = 1, 
+  nsim = 99
+)
+```
+
+## Visualising the distribution of EHSA classes
+
+```{r}
+ggplot(data = ehsa,
+       aes(x = classification)) +
+  geom_bar()
+```
+
+## Visualising EHSA
+
+```{r}
+hunan_ehsa <- hunan %>%
+  left_join(ehsa,
+            by = join_by(County == location))
+
+ehsa_sig <- hunan_ehsa  %>%
+  filter(p_value < 0.05)
 tmap_mode("plot")
-tm_shape(HCSA) +
+tm_shape(hunan_ehsa) +
   tm_polygons() +
-  tm_borders(alpha = 0.5) +
-tm_shape(HCSA_sig) +
-  tm_fill("cluster") + 
-  tm_borders(alpha = 0.4)
+  tm_borders(fill_alpha = 0.5) +
+tm_shape(ehsa_sig) +
+  tm_fill("classification") + 
+  tm_borders(fill_alpha = 0.4)
 ```
-
-
-
-
-
-
