@@ -1,5 +1,5 @@
 ---
-title: "Hands-on_Ex0b"
+title: "Hands-on_Ex06"
 description: "Global Measures of Spatial Autocorrelation"
 author: "Tai Qiu Yan"
 date: "October 1, 2025"
@@ -808,7 +808,7 @@ plot(clust6,
      add=TRUE)
 ```
 
-## 8.6 **Visualising the clusters in choropleth map** 
+## 8.6 **Visualising the clusters in choropleth map**
 
 The code chunk below is used to plot the newly derived clusters by using SKATER method.
 
