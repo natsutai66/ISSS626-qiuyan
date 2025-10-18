@@ -13,7 +13,6 @@ execute:
   freeze: true
 ---
 
-
 # 1 Overview
 
 Geographically weighted regression (GWR) is a spatial statistical technique that takes non-stationary variables into consideration (e.g., climate; demographic factors; physical environment characteristics) and models the local relationships between these independent variables and an outcome of interest (also known as dependent variable). In this hands-on exercise, you will learn how to build hedonic pricing models by using GWR methods. The dependent variable is the resale prices of condominium in 2015. The independent variables are divided into either structural and locational.
@@ -618,17 +617,11 @@ bw.fixed <- bw.gwr(
     PROX_BUS_STOP   + NO_Of_UNITS + FAMILY_FRIENDLY + 
     FREEHOLD, 
   data=condo_resale.sf, 
-  approach="CV", 
+  approach="AIC", 
   kernel="gaussian", 
   adaptive=FALSE, 
   longlat=FALSE)
 ```
-
-#### 9.1.1.quiz
-
-The recommended bandwidth is expressed in metres because the argument longlat = FALSE was specified in the function call.
-
-When longlat = FALSE, the coordinates in the dataset are treated as projected coordinates (for example, Singapore’s SVY21 / EPSG:3414 coordinate system), where the unit of measurement is metres rather than degrees.
 
 ### 9.1.2 GWModel method - fixed bandwith
 
@@ -652,7 +645,7 @@ gwr.fixed <- gwr.basic(
 gwr.fixed
 ```
 
-The report shows that the AICc of the gwr is 42263.61 which is significantly smaller than the globel multiple linear regression model of 42967.1.
+Using GWR, we compared bandwidths chosen by AICc versus LOOCV. Conceptually, AICc optimizes model fit while penalizing complexity (better for inference/interpretation), whereas CV minimizes out-of-sample error (better for prediction), often yielding a slightly larger, smoother bandwidth. In our runs, both methods effectively selected the same bandwidth, so diagnostics (AICc, RSS, R²) were nearly identical—evidence that the data’s optimal smoothing level is stable. GWR substantially outperformed global OLS, indicating strong spatial non-stationarity (notably for AREA_SQM, distance to CBD/MRT, parks, and FREEHOLD). Given our objective, we would report the AICc-based model in the main text and include CV results for robustness. Note the non-normal residuals; a log transformation of price can further stabilize inference.
 
 ## 9.2 Building Adaptive Bandwidth GWR Model
 
@@ -750,7 +743,18 @@ tmap_mode("plot")
 ```
 
 ```{r}
-tm_shape(mpsz_svy21)+
+glimpse(mpsz)
+        
+```
+
+```{r}
+mpsz_f <- mpsz %>%
+  filter(PLN_AREA_N == "HOUGANG")
+
+```
+
+```{r}
+tm_shape(mpsz_f)+
   tm_polygons(fill_alpha = 0.1) +
 tm_shape(condo_resale.sf.adaptive) +  
   tm_dots(col = "Local_R2",
@@ -762,6 +766,10 @@ tm_shape(condo_resale.sf.adaptive) +
 ```{r}
 tmap_mode("plot")
 ```
+
+In Hougang, the local R² values of the GWR model vary between 0.65 and 1.0, with most points falling in the higher ranges (0.85–0.95 and even 0.95–1.0). This indicates that the model explains a large proportion of local variation in condominium resale prices within Hougang. The points are unevenly distributed, with clusters of high local R² values concentrated in certain subzones, while other areas have fewer or no observations plotted (shown as “Missing”).
+
+Overall, the visualisation suggests that the GWR model fits particularly well in specific parts of Hougang, where the explanatory variables capture pricing dynamics strongly, while other pockets have weaker explanatory power or lack sufficient data. This spatial variation highlights that the model’s performance is not uniform across the entire planning area but is locally strong where housing and amenity characteristics are more consistent.
 
 ## 9.6 Visualising coefficient estimates
 
@@ -796,9 +804,3 @@ tmap_arrange(AREA_SQM_SE, AREA_SQM_TV,
 ```{r}
 tmap_mode("plot")
 ```
-
-# 10 Reference
-
-Gollini I, Lu B, Charlton M, Brunsdon C, Harris P (2015) “GWmodel: an R Package for exploring Spatial Heterogeneity using Geographically Weighted Models”. Journal of Statistical Software, 63(17):1-50, http://www.jstatsoft.org/v63/i17/
-
-Lu B, Harris P, Charlton M, Brunsdon C (2014) “The GWmodel R Package: further topics for exploring Spatial Heterogeneity using GeographicallyWeighted Models”. Geo-spatial Information Science 17(2): 85-101, http://www.tandfonline.com/doi/abs/10.1080/1009502.2014.917453
