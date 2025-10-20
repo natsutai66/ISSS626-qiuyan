@@ -32,6 +32,8 @@ DT – An R interface to the DataTables JavaScript library, enabling interactive
 
 Kendall – Implements the Mann-Kendall trend test and related functions for detecting monotonic trends in time series data.
 
+scales – Provides tools for scaling data and controlling axis, legend, and color breaks in visualisations.
+
 ```{r}
 pacman::p_load(tidyverse, sf, sfdep, tmap, knitr, kableExtra, DT, Kendall, scales)
 ```
