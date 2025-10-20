@@ -290,7 +290,9 @@ ii_map <- tm_shape(mpsz) +
               ),
               fill.legend = tm_legend(
                 title = "Local Moran's I",
-                position = tm_pos_in("right", "bottom")
+                position = tm_pos_in("right", "bottom"),
+                title.size = 0.7,        # Smaller title
+                text.size = 0.6,
               )
   ) +
   tm_borders(col = "grey40", lwd = 0.5) +
@@ -316,11 +318,11 @@ p_ii_map <- tm_shape(mpsz) +
 tmap_arrange(ii_map, p_ii_map, asp = 1, ncol = 2)
 ```
 
-The Local Moran’s I geovisualisation for the weekday morning peak reveals distinct spatial clustering of bus trip activity across Singapore.
+The Local Moran's I geovisualisation for the weekday morning peak reveals strong spatial clustering of bus trip activity across Singapore.
 
-On the left map, areas shaded in dark blue (high positive Local Moran’s I) represent clusters of high trip counts located near other high-trip areas, forming significant commuting hotspots. These are mainly seen in the western corridor (Jurong East, Clementi), northeastern estates (Hougang, Sengkang, Punggol), and northern towns (Woodlands, Yishun), which are key residential areas generating large commuter flows. In contrast, areas shaded in brown to red indicate negative values, suggesting spatial outliers—locations with high or low trip counts surrounded by the opposite trend. These tend to occur in industrial and peripheral regions, where demand is patchy.
+The left map shows medium to dark blue areas (2 to 5) identifying High-High clusters concentrated in central, northeastern, northern, and western regions including towns like Tampines, Punggol, Yishun, Woodlands, Jurong, and the CBD corridor. These represent significant commuter hotspots where high trip counts are surrounded by similarly high-demand hexagons, reflecting major residential-to-workplace flows during morning peak hours. Light brown/orange shades (-1 to 0) highlight weak clustering or spatial outliers in peripheral and industrial zones where trip patterns diverge from neighbors. The right map confirms statistical robustness through p-values. Dark red shades (p < 0.001 to 0.01) concentrated across central, northern, northeastern, and western Singapore demonstrate that clustering is highly significant and systematic, not random. Pale areas (p > 0.05) indicate dispersed patterns in low-density zones.
 
-The right map shows the p-values of Local Moran’s I, highlighting the statistical significance of these clusters. Darker red shades (<0.01) point to highly significant clusters concentrated in central, northern, and northeastern Singapore, confirming that spatial clustering of trip demand in these regions is not random but systematic. Areas with pale shades (>0.1) indicate no statistically significant clustering, reflecting more dispersed or random travel demand patterns.
+Overall, the analysis reveals strong positive spatial autocorrelation with concentrated morning demand hotspots aligned with major commuter corridors, residential estates, and transit hubs, confirming systematic workplace-bound travel patterns during the weekday morning peak.
 
 ### Moran scatterplot with standardised variable
 
@@ -357,11 +359,12 @@ ggplot(data = lisa_morning,
   theme_minimal()
 ```
 
-The scatter plot provides a statistical interpretation of the spatial autocorrelation in weekday morning trips. The strong clustering of points in the High-High quadrant (red) shows areas where hexagons with high trip counts are surrounded by other high-trip hexagons, suggesting distinct hotspots of morning bus activity. These clusters are often linked to dense residential or employment zones with high commuting demand. Conversely, the Low-Low quadrant (blue) indicates cold spots, where low-trip hexagons are spatially clustered, likely in peripheral or less populated regions.
+The High-High quadrant (red, upper right) contains numerous points representing hexagons with high trip counts surrounded by similarly high-trip neighbors, forming significant positive spatial autocorrelation clusters in dense residential and employment zones with strong commuting demand. The Low-Low quadrant (dark blue, lower left) shows cold spots where low-trip hexagons cluster together, typically in peripheral or less populated regions, also exhibiting positive spatial autocorrelation.
 
-The smaller presence of High-Low (pink) and Low-High (light blue) points reflects outliers. High-Low points represent isolated high-trip hexagons surrounded by low-trip areas, suggesting unique hubs, while Low-High points indicate underperforming hexagons embedded within busier regions. The regression line slope being positive supports the presence of overall positive spatial autocorrelation, meaning that similar trip intensities tend to cluster together.
+The High-Low quadrant (pink, lower right) contains few points representing spatial outliers—isolated high-trip hexagons surrounded by low-trip areas, suggesting unique transit hubs or stations. The Low-High quadrant (light blue, upper left) shows underperforming hexagons within busier regions, indicating negative spatial autocorrelation outliers.
+The positive slope of the regression line confirms overall positive spatial autocorrelation, meaning similar trip intensities cluster together systematically.
 
-In summary, the scatterplot confirms that weekday morning bus trips are not randomly distributed, but spatially concentrated into significant hotspot and coldspot clusters, with limited outliers. This provides statistical evidence of strong spatial dependence in travel demand patterns during morning peak hours.
+In summary, the scatterplot validates that weekday morning bus trips exhibit strong positive spatial dependence, with pronounced hotspot and coldspot clustering and minimal outliers.
 
 ### LISA Map
 
@@ -857,11 +860,11 @@ p_ii_map <- tm_shape(mpsz) +
 tmap_arrange(ii_map, p_ii_map, asp = 1, ncol = 2)
 ```
 
-On the left map, positive values (blue shades) indicate clusters where high-trip hexagons are located near other high-trip hexagons, forming strong evening hotspots. These are mainly concentrated in the western corridor, central regions, and northeastern towns, reflecting strong residential demand as commuters return home in the evening. In contrast, negative values (brown to red) represent spatial outliers, where high-trip areas are surrounded by low-trip neighbors or vice versa. These appear in more peripheral or industrial areas, where trip demand is uneven.
+The Local Moran's I analysis for the weekday afternoon peak reveals moderate spatial clustering patterns with different characteristics from the morning peak.
 
-The right map of p-values shows the statistical significance of these clusters. Darker red areas (<0.01) highlight significant clustering, particularly in central, northern, and northeastern Singapore, confirming that evening trip concentrations in these regions are systematic rather than random. Lighter shades (>0.1) denote regions with weaker or insignificant clustering, where travel patterns are more dispersed.
+The left map shows light blue areas (1 to 2) indicating moderate High-High clusters spread across central, northeastern, western, and southern regions, representing residential and transit hubs with sustained afternoon bus demand. Light orange shades (-1 to 0) reflect weak clustering or spatial outliers in peripheral and transitional zones where trip volumes diverge from neighboring areas. Compared to the morning peak, clustering is less concentrated and more dispersed, reflecting varied return journey patterns and non-commute trips. The p-value map confirms statistical significance, with dark red shades (p < 0.001 to 0.01) concentrated in central, northern, northeastern, and western regions, indicating robust spatial clustering. Pale areas (p > 0.05) suggest no significant clustering in suburban zones.
 
-Overall, the maps indicate that weekday afternoon trips are strongly clustered in key residential and transport hubs, reinforcing their role as destinations during the evening return commute, while peripheral areas remain less significant in shaping overall trip patterns.
+Overall, the afternoon peak exhibits moderate spatial autocorrelation with hotspots distributed across multiple residential corridors. Unlike the morning's concentrated workplace-bound flows, afternoon patterns are more diffused
 
 ### Moran scatterplot with standardised variable
 
@@ -898,7 +901,13 @@ ggplot(data = lisa_afternoon,
   theme_minimal()
 ```
 
-The scatter plot for the weekday afternoon peak shows a clear dominance of High-High clusters (red) and Low-Low clusters (blue), confirming that bus trips remain strongly spatially autocorrelated during the evening commute. The regression line indicates positive spatial dependence, meaning similar trip levels tend to group together. Outliers in the High-Low and Low-High quadrants are limited, suggesting that most demand patterns are consistent across neighboring areas.
+The Moran scatterplot for the weekday afternoon peak reveals moderate positive spatial autocorrelation with distinct characteristics from the morning pattern.
+
+The High-High quadrant (red) shows fewer and more dispersed points compared to morning peak, indicating that high-trip clusters are less concentrated during afternoon hours. This reflects more varied return journey patterns as commuters travel from multiple employment centers to diverse residential areas. The Low-Low quadrant (dark blue) remains densely populated, confirming persistent cold spots in peripheral regions.
+
+Outliers (High-Low and Low-High) are more visible than in the morning, particularly in the High-Low quadrant (pink), suggesting isolated high-activity hubs surrounded by lower-demand areas. The flatter regression slope compared to morning peak indicates weaker but still positive spatial autocorrelation.
+
+Overall, the afternoon scatterplot confirms that while spatial clustering persists, it is less pronounced and more diffused than morning patterns, reflecting the decentralized nature of evening commutes with multiple origins and destinations rather than concentrated workplace-bound flows.
 
 ### LISA Map
 
@@ -1379,11 +1388,12 @@ p_ii_map <- tm_shape(mpsz) +
 tmap_arrange(ii_map, p_ii_map, asp = 1, ncol = 2)
 ```
 
-On the left map, positive values (blue shades) show clusters of high-trip hexagons adjacent to other high-trip hexagons, indicating areas of consistently strong demand. These clusters appear mainly in the central, northern, and northeastern regions, reflecting the role of major residential towns and popular activity hubs as key weekend trip generators. In contrast, negative values (brown shades) highlight spatial outliers—locations where demand patterns differ from their surroundings, such as pockets of low trips near busier zones or isolated hotspots in low-demand areas.
+The Local Moran's I analysis for the weekend/holiday peak reveals moderate spatial clustering patterns driven by leisure and non-work trips.
 
-The right map of p-values reveals the statistical significance of these patterns. Darker red shades (<0.01) confirm highly significant clusters, concentrated in central and northern parts of the island. These indicate systematic spatial clustering of weekend bus activity, likely linked to shopping centres, recreational spaces, or well-connected transit nodes. Lighter shades (>0.1) mark areas with weaker or insignificant clustering, where demand is more dispersed and less structured.
+The left map shows light blue areas (1 to 2) indicating moderate High-High clusters distributed across central, northeastern, western, and southern regions, where high trip counts cluster together, reflecting shopping and recreational travel to malls and town centers. Light orange shades (-1 to 0) represent weak clustering or spatial outliers in peripheral areas. Notably, clustering is less concentrated than weekday patterns, with activity more evenly dispersed across the island.
+The right map displays statistical significance through p-values. Dark red shades (p < 0.001 to 0.01) confirm highly significant clusters in central, northern, northeastern, and western zones, while pale areas (p > 0.05) indicate no significant clustering in suburban regions.
 
-Overall, the maps suggest that weekend and holiday bus trips are not randomly distributed but exhibit strong clustering in central and northern Singapore, reinforcing the importance of residential and recreational hubs in shaping travel demand during non-working days.
+Overall, weekend/holiday patterns show moderate spatial autocorrelation shaped by diverse leisure destinations. Unlike the commuter-driven weekday morning peak with concentrated hotspots, weekend activity is more dispersed.
 
 ### Moran scatterplot with standardised variable
 
@@ -1420,9 +1430,13 @@ ggplot(data = lisa_weekend,
   theme_minimal()
 ```
 
-The scatter plot for weekend/holiday trips (11am–8pm) shows strong evidence of spatial autocorrelation, with two dominant clusters: High-High (red) and Low-Low (blue). The High-High clusters indicate hexagons with high bus trip volumes surrounded by similarly high-demand neighbors, reflecting key residential and activity hubs that attract sustained weekend travel. Conversely, the Low-Low clusters highlight peripheral or less connected areas where consistently low trip counts group together.
+The Moran scatterplot for weekend/holiday trips reveals moderate positive spatial autocorrelation with a more balanced and dispersed distribution compared to weekday patterns.
 
-The regression line has a clear positive slope, reinforcing that trip intensities are spatially dependent—high values tend to cluster with high, and low with low. Outliers in the High-Low (pink) and Low-High (light blue) quadrants are relatively limited, suggesting that demand patterns during weekends and holidays are broadly consistent across neighboring hexagons
+The High-High quadrant (red) shows a wider spread of points across different standardized trip levels, indicating that high-demand clusters are less tightly concentrated and more evenly distributed across multiple leisure destinations including shopping districts, recreational zones, and town centers. This reflects the diverse nature of weekend travel with various trip purposes rather than concentrated commuter flows.
+
+The Low-Low quadrant (dark blue) remains densely populated, confirming persistent low-activity zones in peripheral areas. Notably, the Low-High quadrant (light blue) shows more visible points than weekday patterns, suggesting areas of emerging activity embedded within moderately busy regions—possibly secondary retail or recreational spots.
+
+The moderate positive slope indicates that while spatial clustering exists, it is less pronounced than morning peak, reflecting the decentralized and multipurpose nature of weekend/holiday travel. Overall, the scatterplot confirms that weekend bus demand exhibits systematic but diffused spatial patterns
 
 ### LISA Map
 
@@ -1464,7 +1478,7 @@ tm_shape(mpsz) +
   tm_title("LISA Map - Weekend/Holiday (11am-8pm)")
 ```
 
-The LISA map for weekend/holiday trips (11am–8pm) highlights clear clustering patterns in bus demand across Singapore. High-High clusters (red) are concentrated in central, northeastern, and selected western regions, where hexagons with high trip counts are surrounded by other high-demand cells. These hotspots likely reflect popular destinations such as shopping centres, entertainment hubs, and large residential estates that attract strong weekend activity. In contrast, Low-Low clusters (dark blue) are evident in the western and peripheral areas, indicating consistent zones of low demand, often linked to industrial or less connected estates.
+The LISA map for weekend/holiday trips highlights clear clustering patterns in bus demand across Singapore. High-High clusters (red) are concentrated in central, northeastern, and selected western regions, where hexagons with high trip counts are surrounded by other high-demand cells. These hotspots likely reflect popular destinations such as shopping centres, entertainment hubs, and large residential estates that attract strong weekend activity. In contrast, Low-Low clusters (dark blue) are evident in the western and peripheral areas, indicating consistent zones of low demand, often linked to industrial or less connected estates.
 
 A few outliers, including Low-High and High-Low hexagons, appear along cluster edges, showing transitional zones where demand changes abruptly between adjacent areas. Their presence reflects local heterogeneity, where differences in land use or accessibility create contrasting demand within small spatial boundaries.
 

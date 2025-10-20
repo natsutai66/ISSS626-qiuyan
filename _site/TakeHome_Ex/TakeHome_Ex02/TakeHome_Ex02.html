@@ -366,7 +366,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
     <div>
     <div class="quarto-title-meta-heading">Modified</div>
     <div class="quarto-title-meta-contents">
-      <p class="date-modified">October 20, 2025</p>
+      <p class="date-modified">October 21, 2025</p>
     </div>
   </div>
     
@@ -391,6 +391,7 @@ pre > code.sourceCode > span > a:first-child::before { text-decoration: underlin
 <p>kableExtra – Extends knitr::kable() by providing advanced table styling features. It allows users to create publication-quality tables in HTML and LaTeX.</p>
 <p>DT – An R interface to the DataTables JavaScript library, enabling interactive tables with features such as searching, filtering, sorting, and pagination.</p>
 <p>Kendall – Implements the Mann-Kendall trend test and related functions for detecting monotonic trends in time series data.</p>
+<p>scales – Provides tools for scaling data and controlling axis, legend, and color breaks in visualisations.</p>
 <div class="cell">
 <div class="sourceCode cell-code" id="cb1"><pre class="sourceCode r code-with-copy"><code class="sourceCode r"><span id="cb1-1"><a href="#cb1-1" aria-hidden="true" tabindex="-1"></a>pacman<span class="sc">::</span><span class="fu">p_load</span>(tidyverse, sf, sfdep, tmap, knitr, kableExtra, DT, Kendall, scales)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 </div>
@@ -666,30 +667,32 @@ Projected CRS: SVY21</code></pre>
 <span id="cb17-10"><a href="#cb17-10" aria-hidden="true" tabindex="-1"></a>              ),</span>
 <span id="cb17-11"><a href="#cb17-11" aria-hidden="true" tabindex="-1"></a>              <span class="at">fill.legend =</span> <span class="fu">tm_legend</span>(</span>
 <span id="cb17-12"><a href="#cb17-12" aria-hidden="true" tabindex="-1"></a>                <span class="at">title =</span> <span class="st">"Local Moran's I"</span>,</span>
-<span id="cb17-13"><a href="#cb17-13" aria-hidden="true" tabindex="-1"></a>                <span class="at">position =</span> <span class="fu">tm_pos_in</span>(<span class="st">"right"</span>, <span class="st">"bottom"</span>)</span>
-<span id="cb17-14"><a href="#cb17-14" aria-hidden="true" tabindex="-1"></a>              )</span>
-<span id="cb17-15"><a href="#cb17-15" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
-<span id="cb17-16"><a href="#cb17-16" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tm_borders</span>(<span class="at">col =</span> <span class="st">"grey40"</span>, <span class="at">lwd =</span> <span class="fl">0.5</span>) <span class="sc">+</span></span>
-<span id="cb17-17"><a href="#cb17-17" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tm_title</span>(<span class="st">"Local Moran's I - morning peak"</span>)</span>
-<span id="cb17-18"><a href="#cb17-18" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb17-19"><a href="#cb17-19" aria-hidden="true" tabindex="-1"></a>p_ii_map <span class="ot">&lt;-</span> <span class="fu">tm_shape</span>(mpsz) <span class="sc">+</span></span>
-<span id="cb17-20"><a href="#cb17-20" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tm_polygons</span>(<span class="at">col =</span> <span class="st">"grey90"</span>, <span class="at">border.col =</span> <span class="st">"white"</span>) <span class="sc">+</span></span>
-<span id="cb17-21"><a href="#cb17-21" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb17-22"><a href="#cb17-22" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tm_shape</span>(lisa_morning) <span class="sc">+</span></span>
-<span id="cb17-23"><a href="#cb17-23" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tm_polygons</span>(<span class="at">fill =</span> <span class="st">"p_ii"</span>,</span>
-<span id="cb17-24"><a href="#cb17-24" aria-hidden="true" tabindex="-1"></a>              <span class="at">fill.scale =</span> <span class="fu">tm_scale_intervals</span>(</span>
-<span id="cb17-25"><a href="#cb17-25" aria-hidden="true" tabindex="-1"></a>                <span class="at">breaks =</span> <span class="fu">c</span>(<span class="sc">-</span><span class="cn">Inf</span>, <span class="fl">0.001</span>, <span class="fl">0.01</span>, <span class="fl">0.05</span>, <span class="fl">0.1</span>, <span class="cn">Inf</span>),</span>
-<span id="cb17-26"><a href="#cb17-26" aria-hidden="true" tabindex="-1"></a>                <span class="at">values =</span> <span class="st">"-brewer.Reds"</span></span>
-<span id="cb17-27"><a href="#cb17-27" aria-hidden="true" tabindex="-1"></a>              ),</span>
-<span id="cb17-28"><a href="#cb17-28" aria-hidden="true" tabindex="-1"></a>              <span class="at">fill.legend =</span> <span class="fu">tm_legend</span>(</span>
-<span id="cb17-29"><a href="#cb17-29" aria-hidden="true" tabindex="-1"></a>                <span class="at">title =</span> <span class="st">"p-value"</span>,</span>
-<span id="cb17-30"><a href="#cb17-30" aria-hidden="true" tabindex="-1"></a>                <span class="at">position =</span> <span class="fu">tm_pos_in</span>(<span class="st">"right"</span>, <span class="st">"bottom"</span>)</span>
-<span id="cb17-31"><a href="#cb17-31" aria-hidden="true" tabindex="-1"></a>              )</span>
-<span id="cb17-32"><a href="#cb17-32" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
-<span id="cb17-33"><a href="#cb17-33" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tm_borders</span>(<span class="at">col =</span> <span class="st">"grey40"</span>, <span class="at">lwd =</span> <span class="fl">0.5</span>) <span class="sc">+</span></span>
-<span id="cb17-34"><a href="#cb17-34" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tm_title</span>(<span class="st">"p-values of Local Moran's I"</span>)</span>
-<span id="cb17-35"><a href="#cb17-35" aria-hidden="true" tabindex="-1"></a></span>
-<span id="cb17-36"><a href="#cb17-36" aria-hidden="true" tabindex="-1"></a><span class="fu">tmap_arrange</span>(ii_map, p_ii_map, <span class="at">asp =</span> <span class="dv">1</span>, <span class="at">ncol =</span> <span class="dv">2</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb17-13"><a href="#cb17-13" aria-hidden="true" tabindex="-1"></a>                <span class="at">position =</span> <span class="fu">tm_pos_in</span>(<span class="st">"right"</span>, <span class="st">"bottom"</span>),</span>
+<span id="cb17-14"><a href="#cb17-14" aria-hidden="true" tabindex="-1"></a>                <span class="at">title.size =</span> <span class="fl">0.7</span>,        <span class="co"># Smaller title</span></span>
+<span id="cb17-15"><a href="#cb17-15" aria-hidden="true" tabindex="-1"></a>                <span class="at">text.size =</span> <span class="fl">0.6</span>,</span>
+<span id="cb17-16"><a href="#cb17-16" aria-hidden="true" tabindex="-1"></a>              )</span>
+<span id="cb17-17"><a href="#cb17-17" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb17-18"><a href="#cb17-18" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tm_borders</span>(<span class="at">col =</span> <span class="st">"grey40"</span>, <span class="at">lwd =</span> <span class="fl">0.5</span>) <span class="sc">+</span></span>
+<span id="cb17-19"><a href="#cb17-19" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tm_title</span>(<span class="st">"Local Moran's I - morning peak"</span>)</span>
+<span id="cb17-20"><a href="#cb17-20" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-21"><a href="#cb17-21" aria-hidden="true" tabindex="-1"></a>p_ii_map <span class="ot">&lt;-</span> <span class="fu">tm_shape</span>(mpsz) <span class="sc">+</span></span>
+<span id="cb17-22"><a href="#cb17-22" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tm_polygons</span>(<span class="at">col =</span> <span class="st">"grey90"</span>, <span class="at">border.col =</span> <span class="st">"white"</span>) <span class="sc">+</span></span>
+<span id="cb17-23"><a href="#cb17-23" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-24"><a href="#cb17-24" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tm_shape</span>(lisa_morning) <span class="sc">+</span></span>
+<span id="cb17-25"><a href="#cb17-25" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tm_polygons</span>(<span class="at">fill =</span> <span class="st">"p_ii"</span>,</span>
+<span id="cb17-26"><a href="#cb17-26" aria-hidden="true" tabindex="-1"></a>              <span class="at">fill.scale =</span> <span class="fu">tm_scale_intervals</span>(</span>
+<span id="cb17-27"><a href="#cb17-27" aria-hidden="true" tabindex="-1"></a>                <span class="at">breaks =</span> <span class="fu">c</span>(<span class="sc">-</span><span class="cn">Inf</span>, <span class="fl">0.001</span>, <span class="fl">0.01</span>, <span class="fl">0.05</span>, <span class="fl">0.1</span>, <span class="cn">Inf</span>),</span>
+<span id="cb17-28"><a href="#cb17-28" aria-hidden="true" tabindex="-1"></a>                <span class="at">values =</span> <span class="st">"-brewer.Reds"</span></span>
+<span id="cb17-29"><a href="#cb17-29" aria-hidden="true" tabindex="-1"></a>              ),</span>
+<span id="cb17-30"><a href="#cb17-30" aria-hidden="true" tabindex="-1"></a>              <span class="at">fill.legend =</span> <span class="fu">tm_legend</span>(</span>
+<span id="cb17-31"><a href="#cb17-31" aria-hidden="true" tabindex="-1"></a>                <span class="at">title =</span> <span class="st">"p-value"</span>,</span>
+<span id="cb17-32"><a href="#cb17-32" aria-hidden="true" tabindex="-1"></a>                <span class="at">position =</span> <span class="fu">tm_pos_in</span>(<span class="st">"right"</span>, <span class="st">"bottom"</span>)</span>
+<span id="cb17-33"><a href="#cb17-33" aria-hidden="true" tabindex="-1"></a>              )</span>
+<span id="cb17-34"><a href="#cb17-34" aria-hidden="true" tabindex="-1"></a>  ) <span class="sc">+</span></span>
+<span id="cb17-35"><a href="#cb17-35" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tm_borders</span>(<span class="at">col =</span> <span class="st">"grey40"</span>, <span class="at">lwd =</span> <span class="fl">0.5</span>) <span class="sc">+</span></span>
+<span id="cb17-36"><a href="#cb17-36" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tm_title</span>(<span class="st">"p-values of Local Moran's I"</span>)</span>
+<span id="cb17-37"><a href="#cb17-37" aria-hidden="true" tabindex="-1"></a></span>
+<span id="cb17-38"><a href="#cb17-38" aria-hidden="true" tabindex="-1"></a><span class="fu">tmap_arrange</span>(ii_map, p_ii_map, <span class="at">asp =</span> <span class="dv">1</span>, <span class="at">ncol =</span> <span class="dv">2</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output-display">
 <div>
 <figure class="figure">
@@ -698,9 +701,9 @@ Projected CRS: SVY21</code></pre>
 </div>
 </div>
 </div>
-<p>The Local Moran’s I geovisualisation for the weekday morning peak reveals distinct spatial clustering of bus trip activity across Singapore.</p>
-<p>On the left map, areas shaded in dark blue (high positive Local Moran’s I) represent clusters of high trip counts located near other high-trip areas, forming significant commuting hotspots. These are mainly seen in the western corridor (Jurong East, Clementi), northeastern estates (Hougang, Sengkang, Punggol), and northern towns (Woodlands, Yishun), which are key residential areas generating large commuter flows. In contrast, areas shaded in brown to red indicate negative values, suggesting spatial outliers—locations with high or low trip counts surrounded by the opposite trend. These tend to occur in industrial and peripheral regions, where demand is patchy.</p>
-<p>The right map shows the p-values of Local Moran’s I, highlighting the statistical significance of these clusters. Darker red shades (&lt;0.01) point to highly significant clusters concentrated in central, northern, and northeastern Singapore, confirming that spatial clustering of trip demand in these regions is not random but systematic. Areas with pale shades (&gt;0.1) indicate no statistically significant clustering, reflecting more dispersed or random travel demand patterns.</p>
+<p>The Local Moran’s I geovisualisation for the weekday morning peak reveals strong spatial clustering of bus trip activity across Singapore.</p>
+<p>The left map shows medium to dark blue areas (2 to 5) identifying High-High clusters concentrated in central, northeastern, northern, and western regions including towns like Tampines, Punggol, Yishun, Woodlands, Jurong, and the CBD corridor. These represent significant commuter hotspots where high trip counts are surrounded by similarly high-demand hexagons, reflecting major residential-to-workplace flows during morning peak hours. Light brown/orange shades (-1 to 0) highlight weak clustering or spatial outliers in peripheral and industrial zones where trip patterns diverge from neighbors. The right map confirms statistical robustness through p-values. Dark red shades (p &lt; 0.001 to 0.01) concentrated across central, northern, northeastern, and western Singapore demonstrate that clustering is highly significant and systematic, not random. Pale areas (p &gt; 0.05) indicate dispersed patterns in low-density zones.</p>
+<p>Overall, the analysis reveals strong positive spatial autocorrelation with concentrated morning demand hotspots aligned with major commuter corridors, residential estates, and transit hubs, confirming systematic workplace-bound travel patterns during the weekday morning peak.</p>
 </section>
 <section id="moran-scatterplot-with-standardised-variable" class="level3">
 <h3 class="anchored" data-anchor-id="moran-scatterplot-with-standardised-variable">Moran scatterplot with standardised variable</h3>
@@ -743,9 +746,9 @@ Projected CRS: SVY21</code></pre>
 </div>
 </div>
 </div>
-<p>The scatter plot provides a statistical interpretation of the spatial autocorrelation in weekday morning trips. The strong clustering of points in the High-High quadrant (red) shows areas where hexagons with high trip counts are surrounded by other high-trip hexagons, suggesting distinct hotspots of morning bus activity. These clusters are often linked to dense residential or employment zones with high commuting demand. Conversely, the Low-Low quadrant (blue) indicates cold spots, where low-trip hexagons are spatially clustered, likely in peripheral or less populated regions.</p>
-<p>The smaller presence of High-Low (pink) and Low-High (light blue) points reflects outliers. High-Low points represent isolated high-trip hexagons surrounded by low-trip areas, suggesting unique hubs, while Low-High points indicate underperforming hexagons embedded within busier regions. The regression line slope being positive supports the presence of overall positive spatial autocorrelation, meaning that similar trip intensities tend to cluster together.</p>
-<p>In summary, the scatterplot confirms that weekday morning bus trips are not randomly distributed, but spatially concentrated into significant hotspot and coldspot clusters, with limited outliers. This provides statistical evidence of strong spatial dependence in travel demand patterns during morning peak hours.</p>
+<p>The High-High quadrant (red, upper right) contains numerous points representing hexagons with high trip counts surrounded by similarly high-trip neighbors, forming significant positive spatial autocorrelation clusters in dense residential and employment zones with strong commuting demand. The Low-Low quadrant (dark blue, lower left) shows cold spots where low-trip hexagons cluster together, typically in peripheral or less populated regions, also exhibiting positive spatial autocorrelation.</p>
+<p>The High-Low quadrant (pink, lower right) contains few points representing spatial outliers—isolated high-trip hexagons surrounded by low-trip areas, suggesting unique transit hubs or stations. The Low-High quadrant (light blue, upper left) shows underperforming hexagons within busier regions, indicating negative spatial autocorrelation outliers. The positive slope of the regression line confirms overall positive spatial autocorrelation, meaning similar trip intensities cluster together systematically.</p>
+<p>In summary, the scatterplot validates that weekday morning bus trips exhibit strong positive spatial dependence, with pronounced hotspot and coldspot clustering and minimal outliers.</p>
 </section>
 <section id="lisa-map" class="level3">
 <h3 class="anchored" data-anchor-id="lisa-map">LISA Map</h3>
@@ -1316,9 +1319,9 @@ $ geometry     &lt;POLYGON [m]&gt; POLYGON ((3792.538 27656.57..., POLYGON ((416
 </div>
 </div>
 </div>
-<p>On the left map, positive values (blue shades) indicate clusters where high-trip hexagons are located near other high-trip hexagons, forming strong evening hotspots. These are mainly concentrated in the western corridor, central regions, and northeastern towns, reflecting strong residential demand as commuters return home in the evening. In contrast, negative values (brown to red) represent spatial outliers, where high-trip areas are surrounded by low-trip neighbors or vice versa. These appear in more peripheral or industrial areas, where trip demand is uneven.</p>
-<p>The right map of p-values shows the statistical significance of these clusters. Darker red areas (&lt;0.01) highlight significant clustering, particularly in central, northern, and northeastern Singapore, confirming that evening trip concentrations in these regions are systematic rather than random. Lighter shades (&gt;0.1) denote regions with weaker or insignificant clustering, where travel patterns are more dispersed.</p>
-<p>Overall, the maps indicate that weekday afternoon trips are strongly clustered in key residential and transport hubs, reinforcing their role as destinations during the evening return commute, while peripheral areas remain less significant in shaping overall trip patterns.</p>
+<p>The Local Moran’s I analysis for the weekday afternoon peak reveals moderate spatial clustering patterns with different characteristics from the morning peak.</p>
+<p>The left map shows light blue areas (1 to 2) indicating moderate High-High clusters spread across central, northeastern, western, and southern regions, representing residential and transit hubs with sustained afternoon bus demand. Light orange shades (-1 to 0) reflect weak clustering or spatial outliers in peripheral and transitional zones where trip volumes diverge from neighboring areas. Compared to the morning peak, clustering is less concentrated and more dispersed, reflecting varied return journey patterns and non-commute trips. The p-value map confirms statistical significance, with dark red shades (p &lt; 0.001 to 0.01) concentrated in central, northern, northeastern, and western regions, indicating robust spatial clustering. Pale areas (p &gt; 0.05) suggest no significant clustering in suburban zones.</p>
+<p>Overall, the afternoon peak exhibits moderate spatial autocorrelation with hotspots distributed across multiple residential corridors. Unlike the morning’s concentrated workplace-bound flows, afternoon patterns are more diffused</p>
 </section>
 <section id="moran-scatterplot-with-standardised-variable-1" class="level3">
 <h3 class="anchored" data-anchor-id="moran-scatterplot-with-standardised-variable-1">Moran scatterplot with standardised variable</h3>
@@ -1361,7 +1364,10 @@ $ geometry     &lt;POLYGON [m]&gt; POLYGON ((3792.538 27656.57..., POLYGON ((416
 </div>
 </div>
 </div>
-<p>The scatter plot for the weekday afternoon peak shows a clear dominance of High-High clusters (red) and Low-Low clusters (blue), confirming that bus trips remain strongly spatially autocorrelated during the evening commute. The regression line indicates positive spatial dependence, meaning similar trip levels tend to group together. Outliers in the High-Low and Low-High quadrants are limited, suggesting that most demand patterns are consistent across neighboring areas.</p>
+<p>The Moran scatterplot for the weekday afternoon peak reveals moderate positive spatial autocorrelation with distinct characteristics from the morning pattern.</p>
+<p>The High-High quadrant (red) shows fewer and more dispersed points compared to morning peak, indicating that high-trip clusters are less concentrated during afternoon hours. This reflects more varied return journey patterns as commuters travel from multiple employment centers to diverse residential areas. The Low-Low quadrant (dark blue) remains densely populated, confirming persistent cold spots in peripheral regions.</p>
+<p>Outliers (High-Low and Low-High) are more visible than in the morning, particularly in the High-Low quadrant (pink), suggesting isolated high-activity hubs surrounded by lower-demand areas. The flatter regression slope compared to morning peak indicates weaker but still positive spatial autocorrelation.</p>
+<p>Overall, the afternoon scatterplot confirms that while spatial clustering persists, it is less pronounced and more diffused than morning patterns, reflecting the decentralized nature of evening commutes with multiple origins and destinations rather than concentrated workplace-bound flows.</p>
 </section>
 <section id="lisa-map-1" class="level3">
 <h3 class="anchored" data-anchor-id="lisa-map-1">LISA Map</h3>
@@ -1914,9 +1920,9 @@ $ geometry     &lt;POLYGON [m]&gt; POLYGON ((3792.538 27656.57..., POLYGON ((416
 </div>
 </div>
 </div>
-<p>On the left map, positive values (blue shades) show clusters of high-trip hexagons adjacent to other high-trip hexagons, indicating areas of consistently strong demand. These clusters appear mainly in the central, northern, and northeastern regions, reflecting the role of major residential towns and popular activity hubs as key weekend trip generators. In contrast, negative values (brown shades) highlight spatial outliers—locations where demand patterns differ from their surroundings, such as pockets of low trips near busier zones or isolated hotspots in low-demand areas.</p>
-<p>The right map of p-values reveals the statistical significance of these patterns. Darker red shades (&lt;0.01) confirm highly significant clusters, concentrated in central and northern parts of the island. These indicate systematic spatial clustering of weekend bus activity, likely linked to shopping centres, recreational spaces, or well-connected transit nodes. Lighter shades (&gt;0.1) mark areas with weaker or insignificant clustering, where demand is more dispersed and less structured.</p>
-<p>Overall, the maps suggest that weekend and holiday bus trips are not randomly distributed but exhibit strong clustering in central and northern Singapore, reinforcing the importance of residential and recreational hubs in shaping travel demand during non-working days.</p>
+<p>The Local Moran’s I analysis for the weekend/holiday peak reveals moderate spatial clustering patterns driven by leisure and non-work trips.</p>
+<p>The left map shows light blue areas (1 to 2) indicating moderate High-High clusters distributed across central, northeastern, western, and southern regions, where high trip counts cluster together, reflecting shopping and recreational travel to malls and town centers. Light orange shades (-1 to 0) represent weak clustering or spatial outliers in peripheral areas. Notably, clustering is less concentrated than weekday patterns, with activity more evenly dispersed across the island. The right map displays statistical significance through p-values. Dark red shades (p &lt; 0.001 to 0.01) confirm highly significant clusters in central, northern, northeastern, and western zones, while pale areas (p &gt; 0.05) indicate no significant clustering in suburban regions.</p>
+<p>Overall, weekend/holiday patterns show moderate spatial autocorrelation shaped by diverse leisure destinations. Unlike the commuter-driven weekday morning peak with concentrated hotspots, weekend activity is more dispersed.</p>
 </section>
 <section id="moran-scatterplot-with-standardised-variable-2" class="level3">
 <h3 class="anchored" data-anchor-id="moran-scatterplot-with-standardised-variable-2">Moran scatterplot with standardised variable</h3>
@@ -1959,8 +1965,10 @@ $ geometry     &lt;POLYGON [m]&gt; POLYGON ((3792.538 27656.57..., POLYGON ((416
 </div>
 </div>
 </div>
-<p>The scatter plot for weekend/holiday trips (11am–8pm) shows strong evidence of spatial autocorrelation, with two dominant clusters: High-High (red) and Low-Low (blue). The High-High clusters indicate hexagons with high bus trip volumes surrounded by similarly high-demand neighbors, reflecting key residential and activity hubs that attract sustained weekend travel. Conversely, the Low-Low clusters highlight peripheral or less connected areas where consistently low trip counts group together.</p>
-<p>The regression line has a clear positive slope, reinforcing that trip intensities are spatially dependent—high values tend to cluster with high, and low with low. Outliers in the High-Low (pink) and Low-High (light blue) quadrants are relatively limited, suggesting that demand patterns during weekends and holidays are broadly consistent across neighboring hexagons</p>
+<p>The Moran scatterplot for weekend/holiday trips reveals moderate positive spatial autocorrelation with a more balanced and dispersed distribution compared to weekday patterns.</p>
+<p>The High-High quadrant (red) shows a wider spread of points across different standardized trip levels, indicating that high-demand clusters are less tightly concentrated and more evenly distributed across multiple leisure destinations including shopping districts, recreational zones, and town centers. This reflects the diverse nature of weekend travel with various trip purposes rather than concentrated commuter flows.</p>
+<p>The Low-Low quadrant (dark blue) remains densely populated, confirming persistent low-activity zones in peripheral areas. Notably, the Low-High quadrant (light blue) shows more visible points than weekday patterns, suggesting areas of emerging activity embedded within moderately busy regions—possibly secondary retail or recreational spots.</p>
+<p>The moderate positive slope indicates that while spatial clustering exists, it is less pronounced than morning peak, reflecting the decentralized and multipurpose nature of weekend/holiday travel. Overall, the scatterplot confirms that weekend bus demand exhibits systematic but diffused spatial patterns</p>
 </section>
 <section id="lisa-map-2" class="level3">
 <h3 class="anchored" data-anchor-id="lisa-map-2">LISA Map</h3>
@@ -2008,7 +2016,7 @@ $ geometry     &lt;POLYGON [m]&gt; POLYGON ((3792.538 27656.57..., POLYGON ((416
 </div>
 </div>
 </div>
-<p>The LISA map for weekend/holiday trips (11am–8pm) highlights clear clustering patterns in bus demand across Singapore. High-High clusters (red) are concentrated in central, northeastern, and selected western regions, where hexagons with high trip counts are surrounded by other high-demand cells. These hotspots likely reflect popular destinations such as shopping centres, entertainment hubs, and large residential estates that attract strong weekend activity. In contrast, Low-Low clusters (dark blue) are evident in the western and peripheral areas, indicating consistent zones of low demand, often linked to industrial or less connected estates.</p>
+<p>The LISA map for weekend/holiday trips highlights clear clustering patterns in bus demand across Singapore. High-High clusters (red) are concentrated in central, northeastern, and selected western regions, where hexagons with high trip counts are surrounded by other high-demand cells. These hotspots likely reflect popular destinations such as shopping centres, entertainment hubs, and large residential estates that attract strong weekend activity. In contrast, Low-Low clusters (dark blue) are evident in the western and peripheral areas, indicating consistent zones of low demand, often linked to industrial or less connected estates.</p>
 <p>A few outliers, including Low-High and High-Low hexagons, appear along cluster edges, showing transitional zones where demand changes abruptly between adjacent areas. Their presence reflects local heterogeneity, where differences in land use or accessibility create contrasting demand within small spatial boundaries.</p>
 <p>Overall, the weekend/holiday LISA map confirms that bus trips are not evenly distributed but exhibit strong spatial clustering. Hotspots align with leisure, retail, and dense housing areas, while coldspots dominate less central zones. This pattern underscores the shift in travel behaviour on weekends and holidays, where demand is shaped more by leisure and retail trips than by work-related commuting flows.</p>
 </section>
