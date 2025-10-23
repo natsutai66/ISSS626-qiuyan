@@ -12,6 +12,8 @@ execute:
 
 # 1 Introduction
 
+This report explores the space–time structure of bus trip demand in Singapore using stop-level OD data aggregated to a 750 m hexagonal grid. I integrate geospatial datasets (bus stops and MP19 subzones) with tidy workflows, then build distance-band neighbourhoods and row-standardised weights to study spatial dependence. Descriptive maps and distributions establish baseline patterns for three periods: weekday morning, weekday afternoon, and weekend/holiday. I then apply Local Moran’s I (LISA), the Getis–Ord Gi* statistic, Hot/Cold Spot Analysis (HCSA), and Emerging Hot Spot Analysis (EHSA), together with the Mann–Kendall test, to detect clusters, outliers, and temporal trends in demand.
+
 # 2 Loading the R package
 
 In this exercise, the following packages are used:
@@ -34,8 +36,12 @@ Kendall – Implements the Mann-Kendall trend test and related functions for det
 
 scales – Provides tools for scaling data and controlling axis, legend, and color breaks in visualisations.
 
+patchwork - A lightweight toolkit for composing multiple ggplot2 plots into a single layout using “+” syntax; supports flexible grids, nested layouts, shared guides, and plot annotations/titles.
+
+cowplot – A ggplot2 extension focused on publication-ready figures; provides functions like plot_grid() and ggdraw() to arrange plots, add titles/labels, and fine-tune themes with minimal whitespace.
+
 ```{r}
-pacman::p_load(tidyverse, sf, sfdep, tmap, knitr, kableExtra, DT, Kendall, scales)
+pacman::p_load(tidyverse, sf, sfdep, tmap, knitr, kableExtra, DT, Kendall, scales, patchwork, cowplot)
 ```
 
 # 3 Data Importing and Wrangling
@@ -167,8 +173,34 @@ trips <- trips %>%
   summarise(TRIPS = sum(TRIPS))
 ```
 
+## Building Distance-Based Spatial Weights
 
-# 4 Weekday morning peak
+The code below sets up spatial neighbors and weights using a critical distance, then checks neighbor statistics to ensure the spatial structure is valid.
+
+```{r}
+# Calculate critical distance for all hexagons with bus stops
+critical_dist <- critical_threshold(st_geometry(hexagon))
+
+# Create distance-based neighbors using the critical distance
+nb <- st_dist_band(
+  st_geometry(hexagon),
+  upper = critical_dist)
+
+# Check the number of neighbors for each hexagon
+n_neighbors <- lengths(nb)
+
+# Create spatial weights
+wt <- st_weights(nb, style = "W", allow_zero = TRUE)
+
+cat("Critical distance:", critical_dist, "meters\n")
+cat("Total hexagons:", nrow(hexagon), "\n")
+cat("Hexagons with neighbors:", sum(n_neighbors > 0), "\n")
+cat("Min neighbors:", min(n_neighbors), "\n")
+cat("Max neighbors:", max(n_neighbors), "\n")
+```
+
+
+# 4 Weekday morning 5 - 10 am
 
 ## 4.1 Overview
 
@@ -182,6 +214,11 @@ weekday_morning <- trips %>%
   left_join(hexagon, by = "HEX_ID") %>%
   st_as_sf()
 
+# Aggregate mpsz by PLN_AREA_N to get boundaries
+mpsz_area <- mpsz %>%
+  group_by(PLN_AREA_N) %>%
+  summarise(geometry = st_union(geometry))
+
 tmap_mode("plot")
 
 tm_shape(mpsz) +
@@ -191,7 +228,7 @@ tm_shape(mpsz) +
   tm_polygons(
     fill = "TRIPS",
     fill.scale = tm_scale_intervals(
-      style = "quantile",  # Use style = "quantile" instead
+      style = "quantile",
       n = 5,
       values = "viridis"
     ),
@@ -201,7 +238,9 @@ tm_shape(mpsz) +
     )
   ) +
   tm_borders(col = "grey40", lwd = 0.5) +
-  tm_title("Distribution of Bus Trips - Weekday Morning Peak (6am-9am)") +
+  tm_shape(mpsz_area) +
+  tm_borders(col = "black", lwd = 0.2) +
+  tm_title("Distribution of Bus Trips - Weekday Morning Peak (6-9am)") +
   tm_compass(position = tm_pos_in("left", "top")) +
   tm_scale_bar(position = tm_pos_in("left", "bottom"))
 ```
@@ -211,61 +250,136 @@ The visualisation shows that bus trips during the weekday morning peak (6–9am)
 ### Trip Distribution
 
 ```{r}
-mean_trips <- mean(weekday_morning$TRIPS)
-median_trips <- median(weekday_morning$TRIPS)
-q75 <- quantile(weekday_morning$TRIPS, 0.75)
-q95 <- quantile(weekday_morning$TRIPS, 0.95)
+# Filter out zero trips
+weekday_morning_filtered <- weekday_morning %>% filter(TRIPS > 0)
 
-# Create improved histogram
-ggplot(weekday_morning, aes(x = TRIPS)) +
+# Calculate statistics for filtered data
+mean_trips <- mean(weekday_morning_filtered$TRIPS)
+median_trips <- median(weekday_morning_filtered$TRIPS)
+q95 <- quantile(weekday_morning_filtered$TRIPS, 0.95)
+
+# Plot 1: Original scale histogram (cut off at 95th percentile)
+x_limit <- q95
+p1 <- ggplot(weekday_morning_filtered, aes(x = TRIPS)) +
   geom_histogram(bins = 50, fill = "steelblue", color = "white", alpha = 0.8) +
   geom_vline(aes(xintercept = mean_trips), 
-             color = "red", linetype = "dashed", size = 1) +
+             color = "red", linetype = "dashed", linewidth = 0.8) +
   geom_vline(aes(xintercept = median_trips), 
-             color = "orange", linetype = "dashed", size = 1) +
-  # Add text labels for mean and median
+             color = "orange", linetype = "dashed", linewidth = 0.8) +
   annotate("text", x = mean_trips, y = Inf, 
-           label = paste0("Mean: ", round(mean_trips, 0)), 
-           vjust = 2, hjust = -0.1, color = "red", size = 3.5) +
+           label = paste0("Mean: ", format(round(mean_trips, 0), big.mark = ",")), 
+           vjust = 1.5, hjust = -0.1, color = "red", size = 3.5, fontface = "bold") +
   annotate("text", x = median_trips, y = Inf, 
-           label = paste0("Median: ", round(median_trips, 0)), 
-           vjust = 4, hjust = -0.1, color = "orange", size = 3.5) +
-  # Format x-axis with comma separators
+           label = paste0("Median: ", format(round(median_trips, 0), big.mark = ",")), 
+           vjust = 3, hjust = -0.1, color = "orange", size = 3.5, fontface = "bold") +
   scale_x_continuous(
     labels = label_number(scale = 1/1000, suffix = "k"),
-    breaks = seq(0, max(weekday_morning$TRIPS), by = 20000)
+    breaks = seq(0, x_limit, by = 20000),
+    limits = c(0, x_limit),
+    expand = expansion(mult = c(0.02, 0.05))
   ) +
-  scale_y_continuous(labels = comma) +
+  scale_y_continuous(labels = comma, expand = expansion(mult = c(0, 0.1))) +
   labs(
-    title = "Distribution of Trip Counts - Weekday Morning Peak (6am-9am)",
-    subtitle = paste0("n = ", nrow(weekday_morning), " hexagons | 95th percentile: ", 
-                     round(q95, 0), " trips"),
+    title = "0-95th Percentile",
     x = "Number of Trips",
-    y = "Frequency (Number of Hexagons)") +
-  theme_minimal() +
+    y = "Frequency",
+    caption = paste0("95th percentile: ", format(round(q95, 0), big.mark = ","), " trips")
+  ) +
+  theme_minimal(base_size = 11) +
   theme(
-    plot.title = element_text(face = "bold", size = 14),
-    plot.subtitle = element_text(size = 10, color = "gray40"),
-    axis.title = element_text(size = 11),
-    panel.grid.minor = element_blank()
+    plot.title = element_text(face = "bold", size = 13, hjust = 0.5),
+    axis.title = element_text(size = 10),
+    axis.text.x = element_text(angle = 0, hjust = 0.5, size = 9),
+    panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_line(color = "gray90"),
+    plot.margin = margin(10, 5, 10, 10),
+    plot.caption = element_text(size = 8, color = "gray50", hjust = 1, face = "italic")
   )
+
+# Plot 2: Bar chart for 95th-100th percentile (top 5%)
+top5_data <- weekday_morning_filtered %>% filter(TRIPS >= q95)
+
+p2 <- ggplot(top5_data, aes(x = TRIPS)) +
+  geom_histogram(bins = 25, fill = "coral", color = "white", alpha = 0.8) +
+  scale_x_continuous(
+    labels = label_number(scale = 1/1000, suffix = "k"),
+    expand = expansion(mult = c(0.02, 0.05))
+  ) +
+  scale_y_continuous(labels = comma, expand = expansion(mult = c(0, 0.1))) +
+  labs(
+    title = "Top 5%",
+    x = "Number of Trips",
+    y = "Frequency",
+    caption = paste0("n = ", nrow(top5_data), " hexagons | Max: ", 
+                    format(max(top5_data$TRIPS), big.mark = ","))
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    plot.title = element_text(face = "bold", size = 13, hjust = 0.5),
+    axis.title = element_text(size = 10),
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 9),
+    panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_line(color = "gray90"),
+    plot.margin = margin(10, 5, 10, 5),
+    plot.caption = element_text(size = 8, color = "gray50", hjust = 0.5)
+  )
+
+# Plot 3: Log transformation
+p3 <- ggplot(weekday_morning_filtered, aes(x = log10(TRIPS))) +
+  geom_histogram(bins = 50, fill = "darkgreen", color = "white", alpha = 0.8) +
+  scale_x_continuous(
+    breaks = 0:5,
+    labels = c("1", "10", "100", "1k", "10k", "100k"),
+    expand = expansion(mult = c(0.02, 0.05))
+  ) +
+  scale_y_continuous(labels = comma, expand = expansion(mult = c(0, 0.1))) +
+  labs(
+    title = "Log10 Transformed",
+    x = "Number of Trips (Log Scale)",
+    y = "Frequency",
+    caption = "Distribution shape across all magnitudes"
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    plot.title = element_text(face = "bold", size = 13, hjust = 0.5),
+    axis.title = element_text(size = 10),
+    axis.text.x = element_text(size = 9),
+    panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_line(color = "gray90"),
+    plot.margin = margin(10, 10, 10, 5),
+    plot.caption = element_text(size = 8, color = "gray50", hjust = 0.5)
+  )
+
+# Combine plots with adjusted widths
+combined_plot <- p1 + p2 + p3 + 
+  plot_layout(widths = c(2.5, 1.5, 2.5)) +
+  plot_annotation(
+    title = "Distribution of Trip Counts - Weekday Morning Peak (6-9am)",
+    subtitle = paste0("n = ", format(nrow(weekday_morning_filtered), big.mark = ","), 
+                     " hexagons (zeros excluded)"),
+    theme = theme(
+      plot.title = element_text(face = "bold", size = 15, hjust = 0.5),
+      plot.subtitle = element_text(size = 11, color = "gray40", hjust = 0.5)
+    )
+  )
+
+combined_plot
 ```
-The histogram of trip counts during the weekday morning peak (6–9am) shows a clear right-skewed distribution, where most hexagons generate relatively few trips and only a small number experience very high volumes. The median trip count is 14,934, while the mean is 30,884, reflecting the influence of extreme outliers. The 95th percentile is much higher at 110,640 trips, with a few hexagons exceeding even this threshold, reaching nearly 400,000 trips. This indicates that while the majority of areas have modest bus activity, a small set of high-demand locations—likely major housing estates or transport hubs—contribute disproportionately to overall flows. The skew highlights an uneven distribution of bus demand, with most places generating low-to-moderate trips, but a few nodes acting as critical centers of commuter activity.
+
+This three-panel visualization reveals a highly right-skewed distribution of weekday morning peak trips (6am-9am) across 816 hexagonal zones in the study area. The main distribution (0-95th percentile) shows that the majority of hexagons have relatively low trip counts, with a median of 14,934 trips and mean of 30,884 trips. The substantial gap between median and mean indicates strong positive skew, suggesting most areas experience moderate traffic while a few zones generate disproportionately high trip volumes. The distribution shows a sharp peak near zero with a long tail extending rightward.
+
+The top 5% panel highlights the extreme values in the distribution, where only 41 hexagons exceed the 95th percentile threshold of 110,640 trips, with the maximum reaching 396,146 trips. These outliers likely represent major transportation hubs, central business districts, or key transit corridors that concentrate morning commute activity. 
+
+The log-transformed view provides additional insight by revealing a more normalized, approximately bell-shaped distribution. This transformation suggests the underlying data may follow a log-normal distribution, which is typical for spatial phenomena where multiplicative processes drive variation. The log scale demonstrates that trip generation patterns span multiple orders of magnitude, reflecting the diverse nature of urban zones ranging from quiet residential neighborhoods to major activity centers and employment hubs.
 
 ## 4.2 Local Indicators of Spatial Association(LISA)
 
+The code below computes Local Moran’s I for TRIPS in the weekday-morning hexagons (6–9am), using a distance-band neighbor list at 1984.313 meters.
+
 ```{r}
-critical_dist <- critical_threshold(st_geometry(weekday_morning))
+nb <- st_dist_band(st_geometry(weekday_morning), upper = critical_dist)
+wt <- st_weights(nb, style = "W", allow_zero = TRUE)
 
-nb <- st_dist_band(
-  st_geometry(weekday_morning),
-  upper = critical_dist)
-
-n_neighbors <- lengths(nb)
-
-wt <- st_weights(nb, style = "W")
-
-# Compute Local Moran's I
 set.seed(1234)
 lisa_morning <- weekday_morning %>%
   mutate(
@@ -275,13 +389,17 @@ lisa_morning <- weekday_morning %>%
   unnest(local_moran)
 ```
 
-### Local Moran’s I values and p-values
+### Local Moran’s I values
 
 ```{r}
-ii_map <- tm_shape(mpsz) +
-  tm_polygons(col = "grey90", border.col = "white") +  # base layer
+# Filter for significant Local Moran's I (p-value < 0.1)
+lisa_morning_sig <- lisa_morning %>%
+  filter(p_ii < 0.1)
 
-  tm_shape(lisa_morning) +
+# Create the Local Moran's I map
+ii_map <- tm_shape(mpsz) +
+  tm_polygons(col = "grey90", border.col = "white") +
+  tm_shape(lisa_morning_sig) +
   tm_polygons(fill = "ii",
               fill.scale = tm_scale_intervals(
                 style = "pretty",
@@ -291,42 +409,30 @@ ii_map <- tm_shape(mpsz) +
               fill.legend = tm_legend(
                 title = "Local Moran's I",
                 position = tm_pos_in("right", "bottom"),
-                title.size = 0.7,        # Smaller title
-                text.size = 0.6,
+                title.size = 0.8,
+                text.size = 0.7
               )
   ) +
   tm_borders(col = "grey40", lwd = 0.5) +
-  tm_title("Local Moran's I - morning peak")
+  tm_shape(mpsz_area) +
+  tm_borders(col = "grey30", lwd = 0.2) +
+  tm_title("Local Moran's I - Morning Peak (p-value < 0.1)") +
+  tm_compass(position = tm_pos_in("left", "top")) +
+  tm_scale_bar(position = tm_pos_in("left", "bottom"))
 
-p_ii_map <- tm_shape(mpsz) +
-  tm_polygons(col = "grey90", border.col = "white") +
-
-  tm_shape(lisa_morning) +
-  tm_polygons(fill = "p_ii",
-              fill.scale = tm_scale_intervals(
-                breaks = c(-Inf, 0.001, 0.01, 0.05, 0.1, Inf),
-                values = "-brewer.Reds"
-              ),
-              fill.legend = tm_legend(
-                title = "p-value",
-                position = tm_pos_in("right", "bottom")
-              )
-  ) +
-  tm_borders(col = "grey40", lwd = 0.5) +
-  tm_title("p-values of Local Moran's I")
-
-tmap_arrange(ii_map, p_ii_map, asp = 1, ncol = 2)
+# Display the map
+ii_map
 ```
 
-The Local Moran's I geovisualisation for the weekday morning peak reveals strong spatial clustering of bus trip activity across Singapore.
+The Local Moran's I map reveals significant spatial clustering patterns of bus trip generation during weekday afternoon peak hours (5pm-8pm), with only statistically significant results (p < 0.1) displayed. Positive spatial autocorrelation (blue hexagons, values 0.5-1.5) appears more scattered compared to morning patterns, concentrated primarily in western, southwestern, and selected eastern planning areas. These high-high clusters indicate areas where high trip volumes are surrounded by similarly high-activity neighbors, representing residential zones receiving concentrated return commuter flows during evening peak hours.
 
-The left map shows medium to dark blue areas (2 to 5) identifying High-High clusters concentrated in central, northeastern, northern, and western regions including towns like Tampines, Punggol, Yishun, Woodlands, Jurong, and the CBD corridor. These represent significant commuter hotspots where high trip counts are surrounded by similarly high-demand hexagons, reflecting major residential-to-workplace flows during morning peak hours. Light orange shades (-1 to 0) highlight weak clustering or spatial outliers in peripheral and industrial zones where trip patterns diverge from neighbors. The right map confirms statistical robustness through p-values. Dark red shades (p < 0.001 to 0.01) concentrated across central, northern, northeastern, and western Singapore demonstrate that clustering is highly significant and systematic, not random. Pale areas (p > 0.05) indicate dispersed patterns in low-density zones.
+Moderate positive clusters (light blue, 0-0.5) appear dispersed across various planning areas, suggesting more fragmented evening clustering patterns than morning peaks. Notably, negative spatial autocorrelation (orange to red, -1.0 to 0) appears extensively throughout the island, particularly in central, northern, and eastern regions. These represent spatial outliers—either high-activity hexagons surrounded by low-activity neighbors (high-low outliers) or vice versa (low-high outliers)—indicating transitional boundaries, edge effects between different land uses, or isolated activity centers.
 
-Overall, the analysis reveals strong positive spatial autocorrelation with concentrated morning demand hotspots aligned with major commuter corridors, residential estates, and transit hubs, confirming systematic workplace-bound travel patterns during the weekday morning peak.
+The afternoon pattern differs markedly from morning peaks, showing more dispersed clustering as commuters return from centralized employment hubs to diverse residential locations. The fragmented spatial structure reflects Singapore's polycentric urban form and varied evening travel patterns, with some residential areas forming return-commute clusters while others exhibit irregular demand. 
 
 ### Moran scatterplot with standardised variable
 
-```{r}
+```{r fig.width=10, fig.height=6}
 lisa_morning <- lisa_morning %>%
   mutate(lag_TRIPS = st_lag(
     TRIPS, nb, wt),
@@ -338,11 +444,12 @@ lisa_morning <- lisa_morning %>%
          z_lag_TRIPS = scale(lag_TRIPS),
          .before = 1)
 
-ggplot(data = lisa_morning,
+# Create the Moran scatterplot
+moran_plot <- ggplot(data = lisa_morning,
        aes(x = z_TRIPS,
            y = z_lag_TRIPS,
            color = mean)) +
-  geom_point(size = 2) +
+  geom_point(size = 2, alpha = 0.6) +
   geom_smooth(method = "lm",
               se = FALSE,
               color = "black") +
@@ -356,40 +463,89 @@ ggplot(data = lisa_morning,
   labs(x = "Standardised TRIPS",
        y = "Standardised Spatial Lag of TRIPS",
        title = "Standardised Moran Scatterplot with LISA Quadrants") +
-  theme_minimal()
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+# Create the bar chart for quadrant counts
+quadrant_counts <- lisa_morning %>%
+  st_drop_geometry() %>%
+  count(mean) %>%
+  mutate(mean = factor(mean, levels = c("High-High", "Low-High", 
+                                         "Low-Low", "High-Low")))
+
+bar_plot <- ggplot(quadrant_counts, aes(x = mean, y = n, fill = mean)) +
+  geom_bar(stat = "identity", alpha = 0.8) +
+  geom_text(aes(label = n), vjust = -0.5, size = 4, fontface = "bold") +
+  scale_fill_manual(
+    values = c("High-High" = "red",
+               "Low-Low" = "blue",
+               "Low-High" = "lightblue",
+               "High-Low" = "pink")) +
+  labs(x = "LISA Quadrant",
+       y = "Count of Hexagons",
+       title = "Count by Quadrant") +
+  theme_minimal() +
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Combine plots side by side
+combined_plot <- moran_plot + bar_plot + 
+  plot_layout(widths = c(2, 1)) +
+  plot_annotation(
+    title = "Local Moran's I Analysis - Weekday Morning Peak",
+    theme = theme(plot.title = element_text(face = "bold", size = 14, hjust = 0.5))
+  )
+
+combined_plot
 ```
 
-The High-High quadrant (red, upper right) contains numerous points representing hexagons with high trip counts surrounded by similarly high-trip neighbors, forming significant positive spatial autocorrelation clusters in dense residential and employment zones with strong commuting demand. The Low-Low quadrant (dark blue, lower left) shows cold spots where low-trip hexagons cluster together, typically in peripheral or less populated regions, also exhibiting positive spatial autocorrelation.
+The Moran scatterplot reveals distinct spatial patterns in weekday morning bus trips, with the bar chart quantifying the distribution across LISA quadrants. The Low-Low quadrant (dark blue, 346 hexagons) dominates, representing cold spots where low-trip hexagons cluster together in peripheral or less populated regions, exhibiting strong positive spatial autocorrelation. The High-High quadrant (red, 239 hexagons) shows significant hot spots—high-trip hexagons surrounded by similarly high-trip neighbors in dense residential zones with strong morning commuting demand, forming positive spatial clusters.
 
-The High-Low quadrant (pink, lower right) contains few points representing spatial outliers—isolated high-trip hexagons surrounded by low-trip areas, suggesting unique transit hubs or stations. The Low-High quadrant (light blue, upper left) shows underperforming hexagons within busier regions, indicating negative spatial autocorrelation outliers.
-The positive slope of the regression line confirms overall positive spatial autocorrelation, meaning similar trip intensities cluster together systematically.
+The Low-High quadrant (light blue, 178 hexagons) represents underperforming hexagons within busier regions, indicating negative spatial autocorrelation where low-activity areas are surrounded by high-activity neighbors. The High-Low quadrant (pink, 53 hexagons) contains the fewest outliers—isolated high-trip hexagons surrounded by low-trip areas, suggesting unique transit hubs or edge locations between different activity zones.
 
-In summary, the scatterplot validates that weekday morning bus trips exhibit strong positive spatial dependence, with pronounced hotspot and coldspot clustering and minimal outliers.
+The positive slope of the regression line confirms overall positive spatial autocorrelation, meaning similar trip intensities systematically cluster together. The dominance of Low-Low and High-High quadrants (585 of 816 hexagons, 72%) validates strong spatial dependence in morning trip patterns, with clear segregation between high-activity residential/employment zones and low-activity peripheral areas, while spatial outliers remain minimal.
 
 ### LISA Map
 
-```{r}
-lisa_sig <- lisa_morning %>%
-  filter(p_ii < 0.05)
+```{r fig.width=12, fig.height=5}
+# Count significant quadrants
+quadrant_counts <- lisa_morning_sig %>%
+  st_drop_geometry() %>%
+  count(mean) %>%
+  mutate(mean = factor(mean, levels = c("High-High", "Low-High", 
+                                         "Low-Low", "High-Low")))
 
+# Bar chart
+bar_chart <- ggplot(quadrant_counts, aes(x = mean, y = n, fill = mean)) +
+  geom_bar(stat = "identity", width = 0.7) +
+  geom_text(aes(label = n), vjust = -0.3, size = 5, fontface = "bold") +
+  scale_fill_manual(
+    values = c("High-High" = "red",
+               "Low-Low" = "blue",
+               "Low-High" = "lightblue",
+               "High-Low" = "pink")) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.15))) +
+  labs(x = "LISA Quadrant", 
+       y = "Count of Hexagons", 
+       title = "LISA Quadrant Counts") +
+  theme_minimal() +
+  theme(
+    legend.position = "none",
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 11),
+    axis.text.y = element_text(size = 11),
+    axis.title = element_text(size = 12, face = "bold"),
+    plot.title = element_text(size = 13, face = "bold", hjust = 0.5),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor = element_blank(),
+    plot.margin = margin(10, 10, 10, 10)
+  )
+
+# LISA map
 tmap_mode("plot")
-
-tm_shape(mpsz) +
+lisa_map <- tm_shape(mpsz) +
   tm_polygons(col = "grey90", border.col = "white") +
   
-  tm_shape(lisa_morning) +
-  tm_polygons(fill = "TRIPS",
-              fill.scale = tm_scale_continuous(
-                values = "greys"
-              ),
-              fill.legend = tm_legend(
-                title = "Total TRIPS",
-                position = tm_pos_in("right", "bottom")
-              )
-  ) +
-  tm_borders(col = "grey40", lwd = 0.5) +
-  
-  tm_shape(lisa_sig) +
+  tm_shape(lisa_morning_sig) +
   tm_polygons(fill = "mean",
               fill.scale = tm_scale_categorical(
                 values = c("High-High" = "red",
@@ -398,37 +554,74 @@ tm_shape(mpsz) +
                           "High-Low" = "pink")
               ),
               fill.legend = tm_legend(
-                title = "LISA Quadrants (p < 0.05)",
-                position = tm_pos_in("left", "bottom")
+                title = "LISA Quadrants",
+                position = tm_pos_in("right", "bottom")
               )
   ) +
   tm_borders(col = "black", lwd = 0.5) +
-  tm_title("LISA Map - Weekday Morning Peak (6am-9am)")
+  tm_shape(mpsz_area) +
+  tm_borders(col = "grey30", lwd = 1.5) +
+  tm_layout(
+    main.title = "LISA Map (p-value < 0.1)",
+    main.title.size = 1.2,
+    main.title.fontface = "bold",
+    legend.text.size = 0.8,
+    legend.title.size = 1,
+    inner.margins = c(0.05, 0.05, 0.05, 0.05)
+  )
+
+# Convert tmap to grob
+lisa_map_grob <- tmap_grob(lisa_map)
+
+# Combine
+combined_plot <- plot_grid(
+  lisa_map_grob, 
+  bar_chart, 
+  ncol = 2, 
+  rel_widths = c(2,1.5),
+  labels = NULL
+)
+
+title <- ggdraw() + 
+  draw_label(
+    "Local Indicators of Spatial Association (LISA) - Weekday Morning Peak",
+    fontface = 'bold',
+    size = 15,
+    x = 0.5,
+    hjust = 0.5
+  )
+
+final_plot <- plot_grid(
+  title, 
+  combined_plot,
+  ncol = 1,
+  rel_heights = c(0.06, 0.94)
+)
+
+final_plot
 ```
 
-The LISA map for weekday morning peak reveals clear clusters of significant spatial autocorrelation in bus trip volumes across Singapore. High-High clusters (in red) appear prominently in the central and eastern regions, including dense residential and mixed-use areas, indicating concentrations of high trip volumes surrounded by other high-volume hexagons. These represent strong hotspots of demand during the morning peak. Conversely, Low-Low clusters (in dark blue) are mostly located in the western and peripheral regions, where low trip counts are surrounded by other low-volume areas, reflecting weaker bus demand in suburban or less connected zones.
+The LISA map reveals significant spatial clustering of weekday morning bus trips across Singapore. Low-Low clusters (dark blue, 150 hexagons) slightly dominate, appearing in peripheral, southern, and eastern regions where low trip volumes are surrounded by similarly low-activity neighbors, reflecting weaker demand in less densely populated or non-residential zones. High-High clusters (red, 145 hexagons) are nearly equal in number, concentrated across northern, central-eastern, and western planning areas, representing dense residential zones with concentrated morning commuter demand.
 
-Notably, some Low-High and High-Low outliers (in light blue and pink) emerge along the boundaries of clusters, suggesting transitional zones where high-demand cells are adjacent to low-demand cells and vice versa. The presence of these outliers indicates local heterogeneity and the influence of bordering subzones. Overall, the spatial patterns confirm that bus trips are not randomly distributed but exhibit strong clustering aligned with Singapore’s urban structure, with demand hotspots concentrated in central/eastern hubs and cold spots at the urban periphery.
+Low-High outliers (light blue, 78 hexagons) indicate underperforming hexagons within high-activity areas, typically at cluster edges or transitional zones between different land uses. High-Low outliers (pink, 8 hexagons) are minimal but mark isolated high-demand locations like transit hubs or interchanges surrounded by low-activity areas.
+
+The near-equal distribution of High-High and Low-Low clusters confirms strong positive spatial autocorrelation and clear spatial segregation between high-demand residential zones and low-demand peripheral areas. The pattern aligns with Singapore's polycentric urban structure, where established residential planning areas generate morning trip hotspots feeding commuters toward employment centers, while outliers mark transitional boundaries and strategic transit nodes. Overall, bus trips exhibit systematic spatial clustering rather than random distribution.
 
 ## 4.3 Hot Spots and Cold Spots Analysis (HCSA)
 
-### Gi* values and p-values
+The code below builds a fixed distance–band neighbourhood for each weekday-morning hexagon, creates row-standardised spatial weights, and then computes the Local Getis-Ord Gi* statistic for TRIPS.
 
 ```{r}
-# Compute fixed distance weight matrix
-ct <- critical_threshold(st_geometry(weekday_morning))
-
 weekday_morning_fdw <- weekday_morning %>%
   mutate(nb = include_self(
     st_dist_band(
       st_geometry(geometry),
-      upper = ct)),
+      upper = critical_dist)),
     wt = st_weights(nb,
                     style = "W"),
     .before = 1)
 
 # Compute local Gi*
-
 set.seed(1234)
 
 HCSA_fdw <- weekday_morning_fdw %>%
@@ -437,12 +630,19 @@ HCSA_fdw <- weekday_morning_fdw %>%
       TRIPS, nb, wt, nsim = 99),
     .before = 1) %>%
   unnest(gistar)
+```
 
-# Plot Gi* values
+
+```{r}
+# Filter for significant Gi* values (p < 0.1)
+HCSA_sig <- HCSA_fdw %>%
+  filter(p_sim < 0.1)
+
+# Plot Gi* values for significant hexagons only
 Gi_star_map <- tm_shape(mpsz) +
   tm_polygons(col = "grey90", border.col = "white") +
   
-  tm_shape(HCSA_fdw) +
+  tm_shape(HCSA_sig) +
   tm_polygons(fill = "gi_star",
               fill.scale = tm_scale_intervals(
                 style = "pretty",
@@ -450,63 +650,49 @@ Gi_star_map <- tm_shape(mpsz) +
                 values = "-brewer.rd_bu"),
               fill.legend = tm_legend(
                 title = "local Gi*",
-                position = tm_pos_in(
-                  "right", "bottom"))) +
+                position = tm_pos_in("right", "bottom")
+              )
+  ) +
   tm_borders(col = "grey40", lwd = 0.5) +
-  tm_title("Local Gi* of TRIPS")
+  tm_shape(mpsz_area) +
+  tm_borders(col = "grey30", lwd = 0.2) +
+  tm_title("Local Gi* of TRIPS (p-value < 0.1)") +
+  tm_compass(position = tm_pos_in("left", "top")) +
+  tm_scale_bar(position = tm_pos_in("left", "bottom"))
 
-# Plot p-values
-p_values_map <- tm_shape(mpsz) +
-  tm_polygons(col = "grey90", border.col = "white") +
-  
-  tm_shape(HCSA_fdw) +
-  tm_polygons(fill = "p_sim",
-              fill.scale = tm_scale_intervals(
-                breaks = c(0, 0.001, 0.01, 0.05, 0.1, 1),
-                values = "-brewer.reds"),
-              fill.legend = tm_legend(
-                title = "p-value",
-                position = tm_pos_in("right", "bottom"))) +
-  tm_borders(col = "grey40", lwd = 0.5) +
-  tm_title("p-values of local Gi* of TRIPS")
-
-# Display both maps side by side
-tmap_arrange(Gi_star_map, p_values_map, asp = 1, ncol = 2)
-```
-
-The Local Gi* map (left) highlights concentrated hotspots in central and eastern regions, shown in red, where bus trip intensity is significantly higher than expected. Conversely, coldspots appear in the west and northwest, marked in blue, where trip counts are consistently lower relative to their neighbours. This contrast reflects commuting dynamics, with central and eastern hubs acting as major destinations.
-
-The p-value map (right) supports the robustness of these patterns. Many hotspots and coldspots overlap with areas of low p-values (<0.05, dark red shades), confirming their statistical significance and suggesting that the clustering is unlikely to be due to random variation. Meanwhile, lighter shades (higher p-values) indicate regions where clustering is weaker or not statistically reliable.
-
-### HCSA Map
-
-```{r}
-# HCSA cluster classification
+# HCSA cluster classification with p < 0.1
 HCSA_fdw <- HCSA_fdw %>%
   mutate(HCSA_cluster = case_when(
-    p_sim > 0.05 ~ "Insignificant",
-    p_sim <= 0.05 & cluster == "High" ~ "Hot spot",
-    p_sim <= 0.05 & cluster == "Low" ~ "Cold spot",
+    p_sim <= 0.1 & cluster == "High" ~ "Hot spot",
+    p_sim <= 0.1 & cluster == "Low" ~ "Cold spot",
     TRUE ~ "Other"),
     HCSA_cluster = factor(
       HCSA_cluster,
-      levels = c("Insignificant", "Hot spot", "Cold spot")
+      levels = c("Hot spot", "Cold spot")  # Reordered levels
     ),
     .before = 1
   )
 
-# Plot HCSA cluster map
+# Filter to keep only significant hexagons
+HCSA_sig <- HCSA_fdw %>%
+  filter(HCSA_cluster != "Insignificant")
+
+# Aggregate mpsz by PLN_AREA_N to get planning area boundaries
+mpsz_planning <- mpsz %>%
+  group_by(PLN_AREA_N) %>%
+  summarise(geometry = st_union(geometry))
+
+# HCSA cluster map
 HCSA_map <- tm_shape(mpsz) +
   tm_polygons(col = "grey90", border.col = "white") +
   
-  tm_shape(HCSA_fdw) +
+  tm_shape(HCSA_sig) +
   tm_polygons(
     fill = "HCSA_cluster",
     fill.scale = tm_scale_categorical(
       values = c(
-        "grey80",  # Insignificant
-        "red",     # Hot spot
-        "blue"     # Cold spot
+        "Hot spot" = "red",
+        "Cold spot" = "blue"
       )
     ),
     fill.legend = tm_legend(
@@ -514,17 +700,22 @@ HCSA_map <- tm_shape(mpsz) +
       position = tm_pos_in("right", "bottom"))
   ) +
   tm_borders(col = "grey40", lwd = 0.5) +
-  tm_title("HCSA Clusters (p < 0.05)")
+  tm_shape(mpsz_area) +
+  tm_borders(col = "grey30", lwd = 0.2) +
+  tm_title("HCSA Clusters (p-value < 0.1)")
 
-# Gi* map and HCSA map
 tmap_arrange(Gi_star_map, HCSA_map, asp = 1, ncol = 2)
 ```
 
-The right-hand map, showing Hot Spot and Cold Spot Analysis (HCSA) clusters, highlights statistically significant spatial clusters of bus trips during the weekday morning peak (6–9am). Red areas represent hot spots, where hexagons with high trip counts are surrounded by other high trip hexagons. These are concentrated in central and eastern Singapore, indicating consistently high demand in dense urban and employment hubs. Blue areas represent cold spots, where low trip counts cluster together, and these are more evident in peripheral regions such as the western and north-western areas. Grey areas indicate insignificant clusters, where trip patterns do not form clear spatial groupings. This contrast emphasizes that bus trip demand is not evenly distributed but spatially clustered: strong activity occurs in central commuting corridors and urban nodes, while peripheral regions consistently experience low demand.
+The Local Gi* map identifies scattered hot spots (red/orange) across northern, central, and eastern regions indicating high trip clustering intensity, while cold spots (blue) dominate western and peripheral areas with consistently low trips. Higher absolute Gi* values indicate stronger concentration, though the pattern shows localized variations rather than contiguous clusters.
 
-Together, the two maps complement each other: the Local Gi* shows where clustering intensity is strongest, while the HCSA map strengthens interpretation by focusing only on statistically robust clusters.
+The HCSA Clusters map reveals statistically significant spatial clustering of weekday morning bus trips (p < 0.1). Hot spots (red) form extensive contiguous clusters across northern, central-eastern, and western planning areas, representing dense residential zones generating concentrated morning commuter flows from established housing estates with strong transit connectivity. Cold spots (blue) appear across western, northwestern, southern, and peripheral regions, reflecting lower residential density, industrial land uses, or limited bus connectivity. These form contiguous clusters confirming genuine spatial patterns of reduced transit demand in non-residential areas.
 
-## 4.4 Emerging Hot Spot Analysis (EHSA)
+Together, the maps demonstrate clear spatial segregation in morning bus trip generation. The Gi* map shows clustering intensity with localized variations, while the HCSA map emphasizes broader, statistically robust spatial patterns. Both confirm strong spatial autocorrelation, with high-demand residential zones geographically distinct from low-demand peripheral areas, and transitional boundaries revealing spatial heterogeneity where different land use functions meet.
+
+## 4.4 Emerging Hot Spot Analysis (EHSA) - 5 to 10 am
+
+The code below prepares weekday morning (5–10h) trips for Emerging Hot Spot/space–time analysis. It aggregates trips by hexagon × hour, then ensure every hexagon has all hours (filling missing cells with 0) and orders IDs/time consistently. It converts IDs and hours to the right types, then builds a space–time cube (spacetime) by linking the hourly table to the hexagon geometries, and finally checks that the result is a valid space–time cube.
 
 ```{r}
 hex_ids <- hexagon$HEX_ID
@@ -550,6 +741,7 @@ TRIPS_morning_st <- spacetime(
 
 is_spacetime_cube(TRIPS_morning_st) 
 ```
+The code below adds spatial neighbours/weights to the morning space–time cube and computes hourly Local Getis-Ord Gi* for TRIPS. It then flattens the results so each hexagon–hour has a Gi* score and significance.
 
 ```{r}
 # Add neighbours and weights
@@ -575,9 +767,13 @@ gi_morning <- TRIPS_morning_nb %>%
 
 ### Mann-Kendall Test
 
+The code below tests whether each hexagon’s Gi* values show a monotonic time trend (consistently increasing or decreasing) across the selected hours.
+
 H0: No monotonic trend
 
 H1: Monotonic trend is present
+
+alpha: 0.1
 
 ```{r}
 mk_hotspots <- gi_morning %>%
@@ -597,31 +793,11 @@ mk_hotspots_ranked <- mk_hotspots %>%
 mk_hotspots_ranked %>% slice(1:10)
 ```
 
-With reference to the results, we will reject the null hypothesis and infer that there is an upward trend trend.
-
-The Hex H0276 is selected to view the Gi* Trend for morning peak:
-
-```{r}
-hex_trend <- gi_morning %>%
-  st_drop_geometry() %>%
-  filter(HEX_ID == "H0276") %>%
-  select(HEX_ID, HOUR_OF_DAY, gi_star)
-
-ggplot(data = hex_trend, aes(x = HOUR_OF_DAY, y = gi_star)) +
-  geom_line(color = "black") +
-  labs(
-    title = "Gi* Trend across Morning Hours — H0276",
-    x = "Hour of Day",
-    y = "Gi*"
-  ) +
-  theme_light()
-```
-
-The plot for Hex H0276 during the morning 5–10am shows a positive trend in the Gi* statistic. At the start of the time window (5–7am), the Gi* values remain relatively low and negative, indicating that this location is associated with a cold spot of bus trips, where trip intensity is below its surrounding areas. However, from 7am onward, there is a clear upward movement, with Gi* values steadily increasing and approaching zero by 10am.
-
-It confirms the presence of a monotonic increasing trend, suggesting that spatial clustering of trips at this location becomes stronger through the later morning hours. While still remaining below zero (indicating weaker clustering compared to strong hotspots), the improvement signals that demand in this area becomes more aligned with busier surrounding hexagons as the peak progresses.
+With reference to the results, as p-value < alpha, we will reject the null hypothesis and infer that there is a significant trend.
 
 ### Performing Emerging Hotspot Analysis
+
+The code below runs EHSA on the weekday–morning space-time cube to classify each hexagon into temporal hotspot/coldspot types (e.g., persistent, consecutive, new, sporadic).
 
 ```{r}
 set.seed(1234)
@@ -632,13 +808,19 @@ ehsa_morning <- emerging_hotspot_analysis(
   k     = 1,      
   nsim  = 99   
 )
+```
 
+The code below attaches EHSA results back to the hexagon layer and keep only statistically significant cells for mapping.
+
+```{r}
 ehsa_morning_sf <- hexagon %>%
   select(HEX_ID) %>%
   left_join(ehsa_morning, by = c("HEX_ID" = "location")) %>%
-  filter(p_value < 0.05) %>%
+  filter(p_value < 0.1) %>%
   st_as_sf()
 ```
+
+The code below sets a consistent legend order and color scheme for EHSA classes and apply them to the data before plotting.
 
 ```{r}
 ehsa_levels <- c(
@@ -650,21 +832,22 @@ ehsa_levels <- c(
 )
 
 ehsa_colors <- c(
-  "consecutive coldspot" = "#4a90e2",   # dark blue
-  "consecutive hotspot"  = "#e31a1c",   # dark red
-  "new coldspot"         = "#20b2aa",   # light blue
-  "new hotspot"          = "#ff69b4",   # light red/orange
-  "no pattern detected"  = "grey80",    # neutral grey
-  "persistent coldspot"  = "#08519c",   # very dark blue
-  "persistent hotspot"   = "#8b0000",   # very dark red
-  "sporadic coldspot"    = "#c6dbef",   # pastel blue
-  "sporadic hotspot"     = "#fcae91"    # pastel orange
+  "consecutive coldspot" = "#4a90e2",   
+  "consecutive hotspot"  = "#e31a1c",   
+  "new coldspot"         = "#20b2aa",
+  "new hotspot"          = "#ff69b4",  
+  "no pattern detected"  = "grey80", 
+  "persistent coldspot"  = "#08519c", 
+  "persistent hotspot"   = "#8b0000",  
+  "sporadic coldspot"    = "#c6dbef", 
+  "sporadic hotspot"     = "#fcae91" 
 )
 
 ehsa_morning$classification   <- factor(ehsa_morning$classification,   levels = ehsa_levels)
 ehsa_morning_sf$classification <- factor(ehsa_morning_sf$classification, levels = ehsa_levels)
 ```
 
+#### Distribution of EHSA Classes
 
 ```{r}
 ggplot(data = ehsa_morning, 
@@ -686,10 +869,14 @@ ggplot(data = ehsa_morning,
 
 The EHSA classification distribution for weekday mornings (5–10am) reveals that the majority of hexagons fall under no pattern detected, indicating that most areas do not exhibit significant or consistent hotspot or coldspot behaviour. However, a substantial number are classified as sporadic coldspots and sporadic hotspots, reflecting localized and irregular clustering of both low and high bus trip counts. Persistent coldspots are also evident, though persistent hotspots are largely absent, suggesting that consistently high-demand areas are rare in this period. Overall, the results highlight a spatially uneven demand pattern, with significant variability across different parts of the network.
 
-```{r}
+#### EHSA map and Gi* Trends
+
+```{r fig.width=16, fig.height=6}
+# Create the EHSA map
 tmap_mode("plot")
-tm_shape(mpsz) + tm_polygons(col = "grey90", border.col = "white") +
-tm_shape(ehsa_morning_sf) +
+ehsa_map <- tm_shape(mpsz) + 
+  tm_polygons(col = "grey90", border.col = "white") +
+  tm_shape(ehsa_morning_sf) +
   tm_polygons(
     fill = "classification",
     fill.scale = tm_scale_categorical(values = ehsa_colors),
@@ -698,14 +885,104 @@ tm_shape(ehsa_morning_sf) +
       position = tm_pos_in("right", "bottom"))
   ) +
   tm_borders(col = "grey40", lwd = 0.5) +
-  tm_title("Emerging Hot Spot Analysis (EHSA) – Weekday Morning (5–10am)")
+  tm_shape(mpsz_planning) +
+  tm_borders(col = "grey30", lwd = 1.5) +
+  tm_layout(
+    main.title = "EHSA Map",
+    main.title.size = 1.2,
+    main.title.fontface = "bold"
+  )
+
+# Get one representative hexagon from each significant EHSA classification
+representative_hexagons <- ehsa_morning_sf %>%
+  st_drop_geometry() %>%
+  filter(classification != "no pattern detected") %>%
+  group_by(classification) %>%
+  slice(1) %>%
+  ungroup() %>%
+  select(HEX_ID, classification)
+
+# Extract Gi* trends for these hexagons
+hex_trends <- gi_morning %>%
+  st_drop_geometry() %>%
+  filter(HEX_ID %in% representative_hexagons$HEX_ID) %>%
+  select(HEX_ID, HOUR_OF_DAY, gi_star) %>%
+  left_join(representative_hexagons, by = "HEX_ID")
+
+# Create individual plots for each classification type
+plot_list <- list()
+
+for (class in unique(hex_trends$classification)) {
+  hex_data <- hex_trends %>% filter(classification == class)
+  hex_id <- unique(hex_data$HEX_ID)
+  
+  p <- ggplot(data = hex_data, aes(x = HOUR_OF_DAY, y = gi_star)) +
+    geom_line(color = ehsa_colors[class], linewidth = 1.2) +
+    geom_hline(yintercept = 0, linetype = "dashed", color = "grey50") +
+    labs(
+      title = paste0(class, "\n(", hex_id, ")"),
+      x = "Hour of Day",
+      y = "Gi*"
+    ) +
+    theme_minimal() +
+    theme(
+      plot.title = element_text(face = "bold", size = 10, hjust = 0.5),
+      axis.title = element_text(size = 9),
+      axis.text = element_text(size = 8)
+    )
+  
+  plot_list[[class]] <- p
+}
+
+# Combine trend plots
+combined_trends <- wrap_plots(plot_list, ncol = 2) +
+  plot_annotation(
+    title = "Gi* Trends by EHSA Classification",
+    theme = theme(
+      plot.title = element_text(face = "bold", size = 12, hjust = 0.5)
+    )
+  )
+
+# Convert tmap to grob
+ehsa_map_grob <- tmap_grob(ehsa_map)
+
+# Combine map and trends side by side
+final_plot <- plot_grid(
+  ehsa_map_grob,
+  combined_trends,
+  ncol = 2,
+  rel_widths = c(1, 1),
+  labels = NULL
+)
+
+# Add overall title
+title <- ggdraw() + 
+  draw_label(
+    "Emerging Hot Spot Analysis (EHSA) – Weekday Morning (5–10am)",
+    fontface = 'bold',
+    size = 15,
+    x = 0.5,
+    hjust = 0.5
+  )
+
+# Combine title with plots
+final_combined <- plot_grid(
+  title,
+  final_plot,
+  ncol = 1,
+  rel_heights = c(0.05, 0.95)
+)
+
+final_combined
 ```
 
-In the EHSA map, most hexagons are classified as no pattern detected, indicating stable or insignificant fluctuations in trip counts across much of the city. However, several areas show distinct hotspot or coldspot dynamics.
+The EHSA analysis reveals distinct spatial and temporal clustering patterns of weekday morning bus trips (5-10am). The map (left) shows blue coldspots concentrated in western and southwestern planning areas, indicating persistently low trip generation zones. Red and orange hotspots appear in central, eastern, and northern regions, representing areas with consistently high morning demand.
 
-In the western and northwestern regions, there is a clear concentration of persistent coldspots (dark blue), where consistently low trip counts are clustered across time. This suggests peripheral estates or less connected areas with structurally lower bus demand. Conversely, sporadic hotspots (peach) and consecutive hotspots (red) emerge in central-western areas, particularly near major transport corridors. These areas likely experience occasional or sustained surges in bus demand, reflecting commuting activity into employment or mixed-use hubs.
+The Gi* trend plots (right) demonstrate diverse temporal behaviors across classifications. Consecutive hotspots (red, H0242) maintain strongly positive Gi* values (2-7) throughout the morning, peaking around 8am, indicating stable high-demand zones that intensify during peak hours. Sporadic hotspots (orange, H0171) show fluctuating positive values (1-3), suggesting intermittent clustering behavior.
 
-A smaller number of new hotspots (pink) and sporadic coldspots (light blue) also appear, pointing to dynamic shifts in travel intensity at localized scales. These classifications are critical because they indicate not just where demand is high or low, but whether such patterns are emerging, persistent, or episodic.
+Persistent coldspots (dark blue, H0007) remain consistently negative (-1.0 to -1.5), confirming stable low-demand areas throughout the period. Consecutive coldspots (light blue, H0118) show declining Gi* values (from -0.5 to -1.5), indicating areas becoming increasingly isolated from surrounding activity as the morning progresses. Sporadic coldspots (H0001) fluctuate near zero, reflecting irregular patterns.
+
+Overall, the analysis confirms that certain planning areas exhibit stable, predictable temporal patterns (consecutive/persistent classifications), while others show irregular, time-varying behaviors (sporadic classifications)
 
 
 # 5 Weekday afternoon peak
@@ -741,6 +1018,8 @@ tm_shape(mpsz) +
     )
   ) +
   tm_borders(col = "grey40", lwd = 0.5) +
+  tm_shape(mpsz_area) +
+  tm_borders(col = "black", lwd = 0.2) +
   tm_title("Distribution of Bus Trips - Weekday Afternoon Peak (5pm-8pm)") +
   tm_compass(position = tm_pos_in("left", "top")) +
   tm_scale_bar(position = tm_pos_in("left", "bottom"))
@@ -751,62 +1030,133 @@ The visualisation shows that bus trips during the weekday afternoon peak (5–8p
 ### Trip Distribution
 
 ```{r}
-mean_trips <- mean(weekday_afternoon$TRIPS)
-median_trips <- median(weekday_afternoon$TRIPS)
-q75 <- quantile(weekday_afternoon$TRIPS, 0.75)
-q95 <- quantile(weekday_afternoon$TRIPS, 0.95)
+# Filter out zero trips
+weekday_afternoon_filtered <- weekday_afternoon %>% filter(TRIPS > 0)
 
-ggplot(weekday_afternoon, aes(x = TRIPS)) +
+# Calculate statistics for filtered data
+mean_trips <- mean(weekday_afternoon_filtered$TRIPS)
+median_trips <- median(weekday_afternoon_filtered$TRIPS)
+q95 <- quantile(weekday_afternoon_filtered$TRIPS, 0.95)
+
+# Plot 1: Original scale histogram (cut off at 95th percentile)
+x_limit <- q95
+p1 <- ggplot(weekday_afternoon_filtered, aes(x = TRIPS)) +
   geom_histogram(bins = 50, fill = "steelblue", color = "white", alpha = 0.8) +
   geom_vline(aes(xintercept = mean_trips), 
-             color = "red", linetype = "dashed", size = 1) +
+             color = "red", linetype = "dashed", linewidth = 0.8) +
   geom_vline(aes(xintercept = median_trips), 
-             color = "orange", linetype = "dashed", size = 1) +
-  annotate("text", x = mean_trips * 1.15, y = Inf, 
-           label = paste0("Mean: ", round(mean_trips, 0)), 
-           vjust = 1.5, color = "red", size = 3.5, fontface = "bold") +
-  annotate("text", x = median_trips * 0.85, y = Inf, 
-           label = paste0("Median: ", round(median_trips, 0)), 
-           vjust = 3, color = "orange", size = 3.5, fontface = "bold") +
-  coord_cartesian(xlim = c(0, 240000)) +
+             color = "orange", linetype = "dashed", linewidth = 0.8) +
+  annotate("text", x = mean_trips, y = Inf, 
+           label = paste0("Mean: ", format(round(mean_trips, 0), big.mark = ",")), 
+           vjust = 1.5, hjust = -0.1, color = "red", size = 3.5, fontface = "bold") +
+  annotate("text", x = median_trips, y = Inf, 
+           label = paste0("Median: ", format(round(median_trips, 0), big.mark = ",")), 
+           vjust = 3, hjust = -0.1, color = "orange", size = 3.5, fontface = "bold") +
   scale_x_continuous(
     labels = label_number(scale = 1/1000, suffix = "k"),
-    breaks = seq(0, 240000, by = 40000)  # 0k, 40k, 80k, 120k, 160k, 200k, 240k
+    breaks = seq(0, x_limit, by = 20000),
+    limits = c(0, x_limit),
+    expand = expansion(mult = c(0.02, 0.05))
   ) +
-  scale_y_continuous(labels = comma) +
+  scale_y_continuous(labels = comma, expand = expansion(mult = c(0, 0.1))) +
   labs(
-    title = "Distribution of Trip Counts - Weekday Afternoon Peak (5pm-8pm)",
-    subtitle = paste0("n = ", nrow(weekday_afternoon), " hexagons | 95th percentile: ", 
-                     round(q95, 0), " trips"),
-    x = "Number of Trips (Thousands)",
-    y = "Frequency (Number of Hexagons)"
+    title = "0-95th Percentile",
+    x = "Number of Trips",
+    y = "Frequency",
+    caption = paste0("95th percentile: ", format(round(q95, 0), big.mark = ","), " trips")
   ) +
-  theme_minimal() +
+  theme_minimal(base_size = 11) +
   theme(
-    plot.title = element_text(face = "bold", size = 14),
-    plot.subtitle = element_text(size = 10, color = "gray40"),
-    axis.title = element_text(size = 11),
-    panel.grid.minor = element_blank()
+    plot.title = element_text(face = "bold", size = 13, hjust = 0.5),
+    axis.title = element_text(size = 10),
+    axis.text.x = element_text(angle = 0, hjust = 0.5, size = 9),
+    panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_line(color = "gray90"),
+    plot.margin = margin(10, 5, 10, 10),
+    plot.caption = element_text(size = 8, color = "gray50", hjust = 1, face = "italic")
   )
+
+# Plot 2: Bar chart for 95th-100th percentile (top 5%)
+top5_data <- weekday_afternoon_filtered %>% filter(TRIPS >= q95)
+
+p2 <- ggplot(top5_data, aes(x = TRIPS)) +
+  geom_histogram(bins = 25, fill = "coral", color = "white", alpha = 0.8) +
+  scale_x_continuous(
+    labels = label_number(scale = 1/1000, suffix = "k"),
+    expand = expansion(mult = c(0.02, 0.05))
+  ) +
+  scale_y_continuous(labels = comma, expand = expansion(mult = c(0, 0.1))) +
+  labs(
+    title = "Top 5%",
+    x = "Number of Trips",
+    y = "Frequency",
+    caption = paste0("n = ", nrow(top5_data), " hexagons | Max: ", 
+                    format(max(top5_data$TRIPS), big.mark = ","))
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    plot.title = element_text(face = "bold", size = 13, hjust = 0.5),
+    axis.title = element_text(size = 10),
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 9),
+    panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_line(color = "gray90"),
+    plot.margin = margin(10, 5, 10, 5),
+    plot.caption = element_text(size = 8, color = "gray50", hjust = 0.5)
+  )
+
+# Plot 3: Log transformation
+p3 <- ggplot(weekday_afternoon_filtered, aes(x = log10(TRIPS))) +
+  geom_histogram(bins = 50, fill = "darkgreen", color = "white", alpha = 0.8) +
+  scale_x_continuous(
+    breaks = 0:5,
+    labels = c("1", "10", "100", "1k", "10k", "100k"),
+    expand = expansion(mult = c(0.02, 0.05))
+  ) +
+  scale_y_continuous(labels = comma, expand = expansion(mult = c(0, 0.1))) +
+  labs(
+    title = "Log10 Transformed",
+    x = "Number of Trips (Log Scale)",
+    y = "Frequency",
+    caption = "Distribution shape across all magnitudes"
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    plot.title = element_text(face = "bold", size = 13, hjust = 0.5),
+    axis.title = element_text(size = 10),
+    axis.text.x = element_text(size = 9),
+    panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_line(color = "gray90"),
+    plot.margin = margin(10, 10, 10, 5),
+    plot.caption = element_text(size = 8, color = "gray50", hjust = 0.5)
+  )
+
+# Combine plots with adjusted widths
+combined_plot <- p1 + p2 + p3 + 
+  plot_layout(widths = c(2.5, 1.5, 2.5)) +
+  plot_annotation(
+    title = "Distribution of Trip Counts - Weekday Afternoon Peak (5pm-8pm)",
+    subtitle = paste0("n = ", format(nrow(weekday_afternoon_filtered), big.mark = ","), 
+                     " hexagons (zeros excluded)"),
+    theme = theme(
+      plot.title = element_text(face = "bold", size = 15, hjust = 0.5),
+      plot.subtitle = element_text(size = 11, color = "gray40", hjust = 0.5)
+    )
+  )
+
+combined_plot
 ```
 
-The histogram of trip counts during the weekday afternoon peak (5–8pm) also shows a pronounced right-skewed distribution, similar to the morning peak. Most hexagons record relatively low trip volumes, while a small number account for very high values. The median trip count is 14,872, but the mean is much higher at 30,263, reflecting the influence of a few extreme outliers. The 95th percentile reaches 100,900 trips, and some hexagons exceed this, with the maximum observed count surpassing 200,000 trips.
+This three-panel visualization reveals a highly right-skewed distribution of weekday afternoon peak trips (5pm-8pm) across 816 hexagonal zones in the study area. The main distribution (0-95th percentile) shows that the majority of hexagons have relatively low trip counts, with a median of 14,872 trips and mean of 30,263 trips. The substantial gap between median and mean indicates strong positive skew, suggesting most areas experience moderate afternoon traffic while a few zones generate disproportionately high trip volumes. The distribution shows a sharp peak near zero with a long tail extending rightward, similar to the morning peak pattern but with slightly lower central values.
 
-This skewed pattern indicates that while the majority of areas contribute modestly to afternoon bus usage, a limited set of high-demand zones—likely large residential towns, key transfer nodes, or major employment areas—generate disproportionately high passenger flows. Compared to the morning peak, the afternoon distribution suggests similarly uneven demand, with commuter flows dispersing across many neighborhoods but still dominated by a small number of critical hubs.
+The top 5% panel highlights the extreme values, where only 41 hexagons exceed the 95th percentile threshold of 100,900 trips, with the maximum reaching 315,613 trips. These outliers likely represent major transportation hubs, central business districts, or key transit corridors that concentrate afternoon commute activity as workers return home. Notably, the maximum afternoon trips (315,613) are lower than morning peaks (396,146), suggesting slightly more dispersed evening travel patterns.
+
+The log-transformed view reveals a more normalized, approximately bell-shaped distribution, confirming the underlying data follows a log-normal distribution. The pattern demonstrates that afternoon trip generation spans multiple orders of magnitude, reflecting diverse urban zones from residential neighborhoods to major activity centers and employment hubs experiencing peak evening demand.
 
 ## 5.2 Local Indicators of Spatial Association(LISA)
 
+The code below computes Local Moran’s I for TRIPS in the weekday-afternoon hexagons (5–8pm), using a distance-band neighbor list at 1984.313 meters.
+
 ```{r}
-critical_dist <- critical_threshold(st_geometry(weekday_afternoon))
-
-nb <- st_dist_band(
-  st_geometry(weekday_afternoon),
-  upper = critical_dist)
-
-n_neighbors <- lengths(nb)
-
-wt <- st_weights(nb, style = "W")
-
 # Compute Local Moran's I
 set.seed(1234)
 lisa_afternoon <- weekday_afternoon %>%
@@ -815,17 +1165,19 @@ lisa_afternoon <- weekday_afternoon %>%
       TRIPS, nb, wt, nsim = 99), 
     .before = 1) %>%
   unnest(local_moran)
-
-glimpse(lisa_afternoon)
 ```
 
-### Local Moran’s I values and p-values
+### Local Moran’s I values
 
 ```{r}
-ii_map <- tm_shape(mpsz) +
-  tm_polygons(col = "grey90", border.col = "white") +  
+# Filter for significant Local Moran's I (p-value < 0.1)
+lisa_afternoon_sig <- lisa_afternoon %>%
+  filter(p_ii < 0.1)
 
-  tm_shape(lisa_afternoon) +
+# Create the Local Moran's I map
+ii_map <- tm_shape(mpsz) +
+  tm_polygons(col = "grey90", border.col = "white") +
+  tm_shape(lisa_afternoon_sig) +
   tm_polygons(fill = "ii",
               fill.scale = tm_scale_intervals(
                 style = "pretty",
@@ -834,41 +1186,31 @@ ii_map <- tm_shape(mpsz) +
               ),
               fill.legend = tm_legend(
                 title = "Local Moran's I",
-                position = tm_pos_in("right", "bottom")
+                position = tm_pos_in("right", "bottom"),
+                title.size = 0.8,
+                text.size = 0.7
               )
   ) +
   tm_borders(col = "grey40", lwd = 0.5) +
-  tm_title("Local Moran's I - afternoon peak")
+  tm_shape(mpsz_area) +
+  tm_borders(col = "grey30", lwd = 0.2) +
+  tm_title("Local Moran's I - Afternoon Peak (p-value < 0.1)") +
+  tm_compass(position = tm_pos_in("left", "top")) +
+  tm_scale_bar(position = tm_pos_in("left", "bottom"))
 
-p_ii_map <- tm_shape(mpsz) +
-  tm_polygons(col = "grey90", border.col = "white") +
-
-  tm_shape(lisa_afternoon) +
-  tm_polygons(fill = "p_ii",
-              fill.scale = tm_scale_intervals(
-                breaks = c(-Inf, 0.001, 0.01, 0.05, 0.1, Inf),
-                values = "-brewer.Reds"
-              ),
-              fill.legend = tm_legend(
-                title = "p-value",
-                position = tm_pos_in("right", "bottom")
-              )
-  ) +
-  tm_borders(col = "grey40", lwd = 0.5) +
-  tm_title("p-values of Local Moran's I")
-
-tmap_arrange(ii_map, p_ii_map, asp = 1, ncol = 2)
+# Display the map
+ii_map
 ```
 
-The Local Moran's I analysis for the weekday afternoon peak reveals moderate spatial clustering patterns with different characteristics from the morning peak.
+The Local Moran's I map reveals significant spatial clustering patterns of bus trip generation during weekday afternoon peak hours, with only statistically significant results (p < 0.1) displayed. Positive spatial autocorrelation (blue hexagons, values 0.5-1.5) appears more scattered compared to morning patterns, concentrated primarily in western, southwestern, and selected eastern planning areas. These high-high clusters indicate areas where high trip volumes are surrounded by similarly high-activity neighbors, representing residential zones receiving concentrated return commuter flows during evening peak hours.
 
-The left map shows light blue areas (1 to 2) indicating moderate High-High clusters spread across central, northeastern, western, and southern regions, representing residential and transit hubs with sustained afternoon bus demand. Light orange shades (-1 to 0) reflect weak clustering or spatial outliers in peripheral and transitional zones where trip volumes diverge from neighboring areas. Compared to the morning peak, clustering is less concentrated and more dispersed, reflecting varied return journey patterns and non-commute trips. The p-value map confirms statistical significance, with dark red shades (p < 0.001 to 0.01) concentrated in central, northern, northeastern, and western regions, indicating robust spatial clustering. Pale areas (p > 0.05) suggest no significant clustering in suburban zones.
+Moderate positive clusters (light blue, 0-0.5) appear dispersed across various planning areas, suggesting more fragmented evening clustering patterns than morning peaks. Notably, negative spatial autocorrelation (orange to red, -1.0 to 0) appears extensively throughout the island, particularly in central, northern, and eastern regions. These represent spatial outliers—either high-activity hexagons surrounded by low-activity neighbors (high-low outliers) or vice versa (low-high outliers)—indicating transitional boundaries, edge effects between different land uses, or isolated activity centers.
 
-Overall, the afternoon peak exhibits moderate spatial autocorrelation with hotspots distributed across multiple residential corridors. Unlike the morning's concentrated workplace-bound flows, afternoon patterns are more diffused
+The afternoon pattern differs markedly from morning peaks, showing more dispersed clustering as commuters return from centralized employment hubs to diverse residential locations. The fragmented spatial structure reflects Singapore's polycentric urban form and varied evening travel patterns, with some residential areas forming return-commute clusters while others exhibit irregular demand.
 
 ### Moran scatterplot with standardised variable
 
-```{r}
+```{r fig.width=10, fig.height=6}
 lisa_afternoon <- lisa_afternoon %>%
   mutate(lag_TRIPS = st_lag(
     TRIPS, nb, wt),
@@ -880,11 +1222,12 @@ lisa_afternoon <- lisa_afternoon %>%
          z_lag_TRIPS = scale(lag_TRIPS),
          .before = 1)
 
-ggplot(data = lisa_afternoon,
+# Create the Moran scatterplot
+moran_plot <- ggplot(data = lisa_afternoon,
        aes(x = z_TRIPS,
            y = z_lag_TRIPS,
            color = mean)) +
-  geom_point(size = 2) +
+  geom_point(size = 2, alpha = 0.6) +
   geom_smooth(method = "lm",
               se = FALSE,
               color = "black") +
@@ -898,41 +1241,91 @@ ggplot(data = lisa_afternoon,
   labs(x = "Standardised TRIPS",
        y = "Standardised Spatial Lag of TRIPS",
        title = "Standardised Moran Scatterplot with LISA Quadrants") +
-  theme_minimal()
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+# Create the bar chart for quadrant counts
+quadrant_counts <- lisa_afternoon %>%
+  st_drop_geometry() %>%
+  count(mean) %>%
+  mutate(mean = factor(mean, levels = c("High-High", "Low-High", 
+                                         "Low-Low", "High-Low")))
+
+bar_plot <- ggplot(quadrant_counts, aes(x = mean, y = n, fill = mean)) +
+  geom_bar(stat = "identity", alpha = 0.8) +
+  geom_text(aes(label = n), vjust = -0.5, size = 4, fontface = "bold") +
+  scale_fill_manual(
+    values = c("High-High" = "red",
+               "Low-Low" = "blue",
+               "Low-High" = "lightblue",
+               "High-Low" = "pink")) +
+  labs(x = "LISA Quadrant",
+       y = "Count of Hexagons",
+       title = "Count by Quadrant") +
+  theme_minimal() +
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Combine plots side by side
+combined_plot <- moran_plot + bar_plot + 
+  plot_layout(widths = c(2, 1)) +
+  plot_annotation(
+    title = "Local Moran's I Analysis - Weekday Afternoon Peak",
+    theme = theme(plot.title = element_text(face = "bold", size = 14, hjust = 0.5))
+  )
+
+combined_plot
 ```
 
-The Moran scatterplot for the weekday afternoon peak reveals moderate positive spatial autocorrelation with distinct characteristics from the morning pattern.
+The Moran scatterplot reveals distinct spatial patterns in weekday afternoon bus trips, with the bar chart quantifying the distribution across LISA quadrants. The Low-Low quadrant (dark blue, 319 hexagons) dominates, representing cold spots where low-trip hexagons cluster together in peripheral or less populated regions, exhibiting strong positive spatial autocorrelation. However, this is notably lower than morning peaks (346), suggesting more dispersed evening patterns.
 
-The High-High quadrant (red) shows fewer and more dispersed points compared to morning peak, indicating that high-trip clusters are less concentrated during afternoon hours. This reflects more varied return journey patterns as commuters travel from multiple employment centers to diverse residential areas. The Low-Low quadrant (dark blue) remains densely populated, confirming persistent cold spots in peripheral regions.
+The Low-High quadrant (light blue, 248 hexagons) shows a significant increase from morning (178), representing underperforming hexagons within busier regions. This indicates substantial negative spatial autocorrelation where low-activity areas are surrounded by high-activity neighbors, reflecting transitional zones and spatial heterogeneity as evening commuters disperse to diverse residential locations.
 
-Outliers (High-Low and Low-High) are more visible than in the morning, particularly in the High-Low quadrant (pink), suggesting isolated high-activity hubs surrounded by lower-demand areas. The flatter regression slope compared to morning peak indicates weaker but still positive spatial autocorrelation.
+The High-High quadrant (red, 192 hexagons) decreased from morning levels (239), showing fewer hot spots—high-trip hexagons surrounded by similarly high-trip neighbors. This reflects more fragmented afternoon clustering compared to concentrated morning residential-to-employment flows. The High-Low quadrant (pink, 57 hexagons) contains minimal outliers—isolated high-trip hexagons in low-activity surroundings.
 
-Overall, the afternoon scatterplot confirms that while spatial clustering persists, it is less pronounced and more diffused than morning patterns, reflecting the decentralized nature of evening commutes with multiple origins and destinations rather than concentrated workplace-bound flows.
+The positive regression slope confirms overall positive spatial autocorrelation, though weaker than morning patterns. The more balanced distribution across quadrants reveals greater spatial complexity in afternoon trip patterns, with increased heterogeneity reflecting Singapore's polycentric structure and varied evening travel behaviors as commuters return from centralized employment hubs to dispersed residential areas.
 
 ### LISA Map
 
-```{r}
-lisa_sig <- lisa_afternoon %>%
-  filter(p_ii < 0.05)
+```{r fig.width=12, fig.height=5}
+# Count significant quadrants
+quadrant_counts <- lisa_afternoon_sig %>%
+  st_drop_geometry() %>%
+  count(mean) %>%
+  mutate(mean = factor(mean, levels = c("High-High", "Low-High", 
+                                         "Low-Low", "High-Low")))
 
+# Bar chart
+bar_chart <- ggplot(quadrant_counts, aes(x = mean, y = n, fill = mean)) +
+  geom_bar(stat = "identity", width = 0.7) +
+  geom_text(aes(label = n), vjust = -0.3, size = 5, fontface = "bold") +
+  scale_fill_manual(
+    values = c("High-High" = "red",
+               "Low-Low" = "blue",
+               "Low-High" = "lightblue",
+               "High-Low" = "pink")) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.15))) +
+  labs(x = "LISA Quadrant", 
+       y = "Count of Hexagons", 
+       title = "LISA Quadrant Counts") +
+  theme_minimal() +
+  theme(
+    legend.position = "none",
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 11),
+    axis.text.y = element_text(size = 11),
+    axis.title = element_text(size = 12, face = "bold"),
+    plot.title = element_text(size = 13, face = "bold", hjust = 0.5),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor = element_blank(),
+    plot.margin = margin(10, 10, 10, 10)
+  )
+
+# LISA map
 tmap_mode("plot")
-
-tm_shape(mpsz) +
+lisa_map <- tm_shape(mpsz) +
   tm_polygons(col = "grey90", border.col = "white") +
   
-  tm_shape(lisa_afternoon) +
-  tm_polygons(fill = "TRIPS",
-              fill.scale = tm_scale_continuous(
-                values = "greys"
-              ),
-              fill.legend = tm_legend(
-                title = "Total TRIPS",
-                position = tm_pos_in("right", "bottom")
-              )
-  ) +
-  tm_borders(col = "grey40", lwd = 0.5) +
-  
-  tm_shape(lisa_sig) +
+  tm_shape(lisa_afternoon_sig) +
   tm_polygons(fill = "mean",
               fill.scale = tm_scale_categorical(
                 values = c("High-High" = "red",
@@ -941,40 +1334,77 @@ tm_shape(mpsz) +
                           "High-Low" = "pink")
               ),
               fill.legend = tm_legend(
-                title = "LISA Quadrants (p < 0.05)",
-                position = tm_pos_in("left", "bottom")
+                title = "LISA Quadrants",
+                position = tm_pos_in("right", "bottom")
               )
   ) +
   tm_borders(col = "black", lwd = 0.5) +
-  tm_title("LISA Map - Weekday Afternoon Peak (6am-9am)")
+  tm_shape(mpsz_area) +
+  tm_borders(col = "grey30", lwd = 1.5) +
+  tm_layout(
+    main.title = "LISA Map (p-value < 0.1)",
+    main.title.size = 1.2,
+    main.title.fontface = "bold",
+    legend.text.size = 0.8,
+    legend.title.size = 1,
+    inner.margins = c(0.05, 0.05, 0.05, 0.05)
+  )
+
+# Convert tmap to grob
+lisa_map_grob <- tmap_grob(lisa_map)
+
+# Combine
+combined_plot <- plot_grid(
+  lisa_map_grob, 
+  bar_chart, 
+  ncol = 2, 
+  rel_widths = c(2,1.5),
+  labels = NULL
+)
+
+title <- ggdraw() + 
+  draw_label(
+    "Local Indicators of Spatial Association (LISA) - Weekday Afternoon Peak",
+    fontface = 'bold',
+    size = 15,
+    x = 0.5,
+    hjust = 0.5
+  )
+
+final_plot <- plot_grid(
+  title, 
+  combined_plot,
+  ncol = 1,
+  rel_heights = c(0.06, 0.94)
+)
+
+final_plot
 ```
 
-The LISA map for the weekday afternoon peak (5–8pm) reveals distinct spatial clustering of bus trip volumes across Singapore. High-High clusters (red) are concentrated in central, northeastern, and selected western areas, where hexagons with high trip counts are surrounded by other high-demand cells. These represent major evening hotspots associated with residential estates and transport nodes, reflecting strong commuter flows returning home during the afternoon peak. In contrast, Low-Low clusters (dark blue) appear in western and peripheral regions, where low trip volumes cluster together, highlighting areas with consistently weaker bus demand.
+The LISA map reveals significantly different spatial clustering patterns for weekday afternoon bus trips compared to morning peaks. The distribution is remarkably balanced, with High-High clusters (red, 68 hexagons), Low-High outliers (light blue, 69 hexagons), and Low-Low clusters (dark blue, 69 hexagons) nearly equal in number. This contrasts sharply with morning patterns where Low-Low and High-High dominated, indicating greater spatial heterogeneity in afternoon travel.
 
-A few Low-High and High-Low outliers (light blue and pink) emerge at the edges of clusters, suggesting transitional zones where high-demand cells border low-demand areas and vice versa. These outliers point to localized heterogeneity, possibly shaped by differences in land use or accessibility within adjacent subzones.
+High-High clusters appear more scattered across northern, central, and eastern planning areas, representing residential zones receiving concentrated return commuter flows. However, their reduced prevalence (68 vs 145 morning) reflects more dispersed evening destination patterns. Low-Low clusters remain present in peripheral and less populated regions but are substantially fewer (69 vs 150 morning), suggesting broader spatial distribution of afternoon activity.
 
-Overall, the afternoon LISA map confirms that bus trips are not randomly distributed but form clear hotspot and coldspot clusters, consistent with Singapore’s urban commuting structure. Hotspots are aligned with key residential hubs and employment-linked zones, while coldspots dominate peripheral areas, reinforcing the spatial divide between dense commuter corridors and low-demand regions.
+The dramatic increase in Low-High outliers (69 vs 78 morning) indicates extensive spatial mixing where low-activity hexagons neighbor high-activity areas, reflecting transitional zones and fragmented clustering as evening commuters disperse from centralized employment hubs to diverse residential locations. High-Low outliers remain minimal (4 hexagons).
+
+The balanced quadrant distribution reveals weaker positive spatial autocorrelation and greater spatial complexity compared to morning peaks. This reflects Singapore's polycentric structure and varied evening travel behaviors, with afternoon trip patterns exhibiting more decentralized, heterogeneous spatial organization.
 
 
 ## 5.3 Hot Spots and Cold Spots Analysis (HCSA)
 
-### Gi* values and p-values
+The code below builds a fixed distance–band neighbourhood for each weekday-afternoon hexagon, creates row-standardised spatial weights, and then computes the Local Getis-Ord Gi* statistic for TRIPS.
 
 ```{r}
-# Compute fixed distance weight matrix
-ct <- critical_threshold(st_geometry(weekday_afternoon))
-
 weekday_afternoon_fdw <- weekday_afternoon %>%
   mutate(nb = include_self(
     st_dist_band(
       st_geometry(geometry),
-      upper = ct)),
+      upper = critical_dist)),
     wt = st_weights(nb,
                     style = "W"),
     .before = 1)
 
 # Compute local Gi*
-
 set.seed(1234)
 
 HCSA_fdw <- weekday_afternoon_fdw %>%
@@ -983,12 +1413,18 @@ HCSA_fdw <- weekday_afternoon_fdw %>%
       TRIPS, nb, wt, nsim = 99),
     .before = 1) %>%
   unnest(gistar)
+```
 
-# Plot Gi* values
+```{r}
+# Filter for significant Gi* values (p < 0.1)
+HCSA_sig <- HCSA_fdw %>%
+  filter(p_sim < 0.1)
+
+# Plot Gi* values for significant hexagons only
 Gi_star_map <- tm_shape(mpsz) +
   tm_polygons(col = "grey90", border.col = "white") +
   
-  tm_shape(HCSA_fdw) +
+  tm_shape(HCSA_sig) +
   tm_polygons(fill = "gi_star",
               fill.scale = tm_scale_intervals(
                 style = "pretty",
@@ -996,65 +1432,49 @@ Gi_star_map <- tm_shape(mpsz) +
                 values = "-brewer.rd_bu"),
               fill.legend = tm_legend(
                 title = "local Gi*",
-                position = tm_pos_in(
-                  "right", "bottom"))) +
+                position = tm_pos_in("right", "bottom")
+              )
+  ) +
   tm_borders(col = "grey40", lwd = 0.5) +
-  tm_title("Local Gi* of TRIPS")
+  tm_shape(mpsz_area) +
+  tm_borders(col = "grey30", lwd = 0.2) +
+  tm_title("Local Gi* of TRIPS (p-value < 0.1)") +
+  tm_compass(position = tm_pos_in("left", "top")) +
+  tm_scale_bar(position = tm_pos_in("left", "bottom"))
 
-# Plot p-values
-p_values_map <- tm_shape(mpsz) +
-  tm_polygons(col = "grey90", border.col = "white") +
-  
-  tm_shape(HCSA_fdw) +
-  tm_polygons(fill = "p_sim",
-              fill.scale = tm_scale_intervals(
-                breaks = c(0, 0.001, 0.01, 0.05, 0.1, 1),
-                values = "-brewer.reds"),
-              fill.legend = tm_legend(
-                title = "p-value",
-                position = tm_pos_in("right", "bottom"))) +
-  tm_borders(col = "grey40", lwd = 0.5) +
-  tm_title("p-values of local Gi* of TRIPS")
-
-# Display both maps side by side
-tmap_arrange(Gi_star_map, p_values_map, asp = 1, ncol = 2)
-```
-
-The Local Gi* map (left) for the weekday afternoon peak shows clear clustering of bus trip intensity across Singapore. Hotspots (red shades) are concentrated in the central, northeastern, and selected western areas, where hexagons register significantly higher trip volumes than their neighbours. These reflect strong evening commuting flows, as passengers return to major residential towns and transport hubs. Conversely, coldspots (blue shades) are evident in the western and northwestern regions, where bus trip counts are consistently lower than surrounding areas, likely reflecting peripheral industrial or less populated zones with weaker demand.
-
-The p-value map (right) reinforces the statistical significance of these patterns. Dark red areas (<0.05) overlap with many identified hotspots and coldspots, confirming that clustering is unlikely to have occurred by chance. In contrast, lighter shades represent areas where spatial clustering is weaker or not statistically significant.
-
-Together, the maps confirm that afternoon bus trips are highly clustered, with strong hotspots forming around dense residential and commuting corridors, while peripheral areas act as stable coldspots. These results highlight the spatially uneven but systematic nature of evening travel demand.
-
-### HCSA Map
-
-```{r}
-# HCSA cluster classification
+# HCSA cluster classification with p < 0.1
 HCSA_fdw <- HCSA_fdw %>%
   mutate(HCSA_cluster = case_when(
-    p_sim > 0.05 ~ "Insignificant",
-    p_sim <= 0.05 & cluster == "High" ~ "Hot spot",
-    p_sim <= 0.05 & cluster == "Low" ~ "Cold spot",
+    p_sim <= 0.1 & cluster == "High" ~ "Hot spot",
+    p_sim <= 0.1 & cluster == "Low" ~ "Cold spot",
     TRUE ~ "Other"),
     HCSA_cluster = factor(
       HCSA_cluster,
-      levels = c("Insignificant", "Hot spot", "Cold spot")
+      levels = c("Hot spot", "Cold spot")  # Reordered levels
     ),
     .before = 1
   )
 
-# Plot HCSA cluster map
+# Filter to keep only significant hexagons
+HCSA_sig <- HCSA_fdw %>%
+  filter(HCSA_cluster != "Insignificant")
+
+# Aggregate mpsz by PLN_AREA_N to get planning area boundaries
+mpsz_planning <- mpsz %>%
+  group_by(PLN_AREA_N) %>%
+  summarise(geometry = st_union(geometry))
+
+# HCSA cluster map
 HCSA_map <- tm_shape(mpsz) +
   tm_polygons(col = "grey90", border.col = "white") +
   
-  tm_shape(HCSA_fdw) +
+  tm_shape(HCSA_sig) +
   tm_polygons(
     fill = "HCSA_cluster",
     fill.scale = tm_scale_categorical(
       values = c(
-        "grey80",  # Insignificant
-        "red",     # Hot spot
-        "blue"     # Cold spot
+        "Hot spot" = "red",
+        "Cold spot" = "blue"
       )
     ),
     fill.legend = tm_legend(
@@ -1062,26 +1482,31 @@ HCSA_map <- tm_shape(mpsz) +
       position = tm_pos_in("right", "bottom"))
   ) +
   tm_borders(col = "grey40", lwd = 0.5) +
-  tm_title("HCSA Clusters (p < 0.05)")
+  tm_shape(mpsz_area) +
+  tm_borders(col = "grey30", lwd = 0.2) +
+  tm_title("HCSA Clusters (p-value < 0.1)")
 
-# Gi* map and HCSA map
 tmap_arrange(Gi_star_map, HCSA_map, asp = 1, ncol = 2)
 ```
 
-The right HCSA map for the weekday afternoon peak shows statistically significant cold spots (blue) dominate the western and northern peripheries, reflecting consistently low trip activity in less densely populated residential or industrial zones. In contrast, hot spots (red) are fewer and more scattered but appear in selected central and northeastern areas, aligning with high-demand nodes such as transport interchanges or dense residential–employment corridors. Grey areas represent insignificant clusters, indicating that many locations do not form statistically robust groupings, with trip activity distributed more heterogeneously.
+The Local Gi* map identifies scattered hot spots (red/orange) across northern, central, and selected eastern regions indicating high afternoon trip clustering intensity, though notably more fragmented than morning patterns. Cold spots (blue) dominate western and peripheral areas with consistently low trips. The dispersed pattern suggests localized intensity variations reflecting diverse evening destination patterns rather than concentrated commuter flows.
 
-When viewed alongside the Local Gi* map (left), which highlights the intensity of clustering, the HCSA map strengthens interpretation by filtering out noise and showing only statistically robust patterns. For the afternoon peak, the HCSA results confirm that significant clustering of high trips is limited compared to the morning, while cold spots remain more widespread and consistent. This contrast suggests a more dispersed commuting demand in the evening, as workers and students return to residential areas from multiple destinations. Overall, the maps together reveal that afternoon bus trip patterns, while still spatially clustered, are less dominated by strong hotspots and instead emphasize widespread cold spot clustering at the periphery.
+The HCSA Clusters map reveals statistically significant spatial clustering of weekday afternoon bus trips (p < 0.1), showing markedly different patterns from morning peaks. Hot spots (red) appear as scattered, smaller clusters across northern, central, and eastern planning areas, representing residential zones receiving return commuter flows. However, these are less extensive and more fragmented than morning clusters, reflecting dispersed evening travel as workers return from centralized employment hubs to diverse residential locations. Cold spots (blue) remain prominent across western, northwestern, and peripheral regions, though their distribution is more varied, confirming spatial patterns of reduced evening transit demand in non-residential areas.
 
-## 5.4 Emerging Hot Spot Analysis (EHSA)
+Together, the maps demonstrate more complex spatial organization in afternoon trip generation compared to morning peaks. The Gi* map shows fragmented clustering intensity, while the HCSA map reveals smaller, dispersed hot spot clusters. Both confirm weaker spatial autocorrelation with greater heterogeneity. The afternoon pattern lacks the clear residential-to-employment spatial segregation characteristic of morning commutes, instead showing decentralized trip generation across multiple activity centers.
+
+## 5.4 Emerging Hot Spot Analysis (EHSA) - 5 to 10 pm
+
+The code below prepares weekday afternoon (17–22h) trips for Emerging Hot Spot/space–time analysis. It aggregates trips by hexagon × hour, then ensure every hexagon has all hours (filling missing cells with 0) and orders IDs/time consistently. It converts IDs and hours to the right types, then builds a space–time cube (spacetime) by linking the hourly table to the hexagon geometries, and finally checks that the result is a valid space–time cube.
 
 ```{r}
 hex_ids <- hexagon$HEX_ID
 
 trips_afternoon_hourly <- trips %>%
-  filter(DAY_TYPE == "WEEKDAY", HOUR_OF_DAY %in% 16:21) %>%
+  filter(DAY_TYPE == "WEEKDAY", HOUR_OF_DAY %in% 17:22) %>%
   group_by(HEX_ID, HOUR_OF_DAY) %>%
   summarise(TRIPS = sum(TRIPS), .groups = "drop") %>%
-  tidyr::complete(HEX_ID = hex_ids, HOUR_OF_DAY = 16:21,
+  tidyr::complete(HEX_ID = hex_ids, HOUR_OF_DAY = 17:22,
                   fill = list(TRIPS = 0)) %>%
   arrange(HEX_ID, HOUR_OF_DAY)
 
@@ -1098,6 +1523,8 @@ TRIPS_afternoon_st <- spacetime(
 
 is_spacetime_cube(TRIPS_afternoon_st) 
 ```
+
+The code below adds spatial neighbours/weights to the afternoon space–time cube and computes hourly Local Getis-Ord Gi* for TRIPS. It then flattens the results so each hexagon–hour has a Gi* score and significance.
 
 ```{r}
 # Add neighbours and weights
@@ -1123,9 +1550,13 @@ gi_afternoon <- TRIPS_afternoon_nb %>%
 
 ### Mann-Kendall Test
 
+The code below tests whether each hexagon’s Gi* values show a monotonic time trend (consistently increasing or decreasing) across the selected hours.
+
 H0: No monotonic trend
 
 H1: Monotonic trend is present
+
+alpha: 0.1
 
 ```{r}
 mk_hotspots_afternoon <- gi_afternoon %>%
@@ -1145,31 +1576,11 @@ mk_hotspots_afternoon_ranked <- mk_hotspots_afternoon %>%
 mk_hotspots_afternoon_ranked %>% slice(1:10)
 ```
 
-With reference to the results, we will reject the null hypothesis and infer that there is an upward trend.
-
-The Hex H0012 is selected to view the Gi* Trend for afternoon peak:
-
-```{r}
-hex_trend <- gi_afternoon %>%
-  st_drop_geometry() %>%
-  filter(HEX_ID == "H0012") %>%
-  select(HEX_ID, HOUR_OF_DAY, gi_star)
-
-ggplot(data = hex_trend, aes(x = HOUR_OF_DAY, y = gi_star)) +
-  geom_line(color = "black") +
-  labs(
-    title = "Gi* Trend across Afternoon Hours — H0012",
-    x = "Hour of Day",
-    y = "Gi*"
-  ) +
-  theme_light()
-```
-
-The plot for Hex H0012 during the afternoon peak 4–9pm shows a clear upward trend in the Gi* statistic. At the start (around 4–5pm), Gi* values are more negative, indicating that this location is associated with a cold spot of bus trips, where trip intensity is significantly lower compared to its neighbors. However, as time progresses, the Gi* values steadily rise, especially between 6–7pm, and continue increasing until 9pm.
-
-Although the Gi* values remain negative overall, the consistent upward trajectory suggests a monotonic increasing trend. This means that bus trip clustering in this location is gradually becoming less cold and more aligned with surrounding activity levels during the afternoon peak. In practical terms, demand here may start from relatively low levels but strengthens toward the later hours, reflecting increasing alignment with busier adjacent hexagons as commuters travel during evening peak hours.
+With reference to the results, as p-value < alpha, we will reject the null hypothesis and infer that there is a significant trend.
 
 ### Performing Emerging Hotspot Analysis
+
+The code below runs EHSA on the weekday–morning space-time cube to classify each hexagon into temporal hotspot/coldspot types.
 
 ```{r}
 set.seed(1234)
@@ -1180,20 +1591,26 @@ ehsa_afternoon <- emerging_hotspot_analysis(
   k     = 1,      
   nsim  = 99   
 )
+```
 
+The code below attaches EHSA results back to the hexagon layer and keep only statistically significant cells for mapping.
+
+```{r}
 ehsa_afternoon_sf <- hexagon %>%
   select(HEX_ID) %>%
   left_join(ehsa_afternoon, by = c("HEX_ID" = "location")) %>%
-  filter(p_value < 0.05) %>%
+  filter(p_value < 0.1) %>%
   st_as_sf()
 ```
 
+The code below applies the consistent legend order and color scheme to the data before plotting.
 
 ```{r}
 ehsa_afternoon$classification   <- factor(ehsa_afternoon$classification,   levels = ehsa_levels)
 ehsa_afternoon_sf$classification <- factor(ehsa_afternoon_sf$classification, levels = ehsa_levels)
 ```
 
+#### Distribution of EHSA Classes
 
 ```{r}
 ggplot(data = ehsa_afternoon, 
@@ -1201,7 +1618,7 @@ ggplot(data = ehsa_afternoon,
   geom_bar(color = "black", alpha = 0.8) +
   scale_fill_manual(values = ehsa_colors, drop = FALSE) +
   labs(
-    title = "Distribution of EHSA Classes – Weekday Afternoon (4–9pm)",
+    title = "Distribution of EHSA Classes – Weekday Afternoon (5–10pm)",
     x = "EHSA Classification", 
     y = "Number of Hexagons"
   ) +
@@ -1212,12 +1629,16 @@ ggplot(data = ehsa_afternoon,
   )
 ```
 
-The EHSA distribution for the weekday afternoon peak 4–9pm shows that most hexagons fall under no pattern detected, suggesting that clustering of demand is limited across much of the city. Among significant categories, consecutive coldspots and persistent coldspots are notable, indicating stable zones of consistently low demand, particularly in less connected areas. Sporadic hotspots also appear, reflecting irregular but short-lived surges in demand at specific locations. By contrast, persistent and consecutive hotspots are nearly absent, underscoring the lack of sustained high-demand clusters during this time window. Overall, the afternoon peak is defined by widespread coldspot dominance, with hotspots emerging only intermittently.
+The EHSA distribution for the weekday afternoon peak (5-10pm) shows that most hexagons fall under no pattern detected, suggesting that clustering of demand is limited across much of the city. Among significant categories, consecutive coldspots and sporadic coldspots are notable, indicating zones of consistently low demand, particularly in peripheral or less-connected areas. Sporadic hotspots also appear prominently, reflecting irregular but short-lived surges in demand at specific locations as evening commuters disperse. By contrast, persistent and consecutive hotspots are nearly absent, underscoring the lack of sustained high-demand clusters during this time window. Overall, the afternoon peak is defined by widespread irregular patterns and coldspot dominance, with hotspots emerging only intermittently and sporadically.
 
-```{r}
+#### EHSA map and Gi* Trends
+
+```{r fig.width=16, fig.height=6}
+# Create the EHSA map
 tmap_mode("plot")
-tm_shape(mpsz) + tm_polygons(col = "grey90", border.col = "white") +
-tm_shape(ehsa_afternoon_sf) +
+ehsa_map <- tm_shape(mpsz) + 
+  tm_polygons(col = "grey90", border.col = "white") +
+  tm_shape(ehsa_afternoon_sf) +
   tm_polygons(
     fill = "classification",
     fill.scale = tm_scale_categorical(values = ehsa_colors),
@@ -1226,11 +1647,104 @@ tm_shape(ehsa_afternoon_sf) +
       position = tm_pos_in("right", "bottom"))
   ) +
   tm_borders(col = "grey40", lwd = 0.5) +
-  tm_title("Emerging Hot Spot Analysis (EHSA) – Weekday Afternoon (4–9pm)")
+  tm_shape(mpsz_planning) +
+  tm_borders(col = "grey30", lwd = 1.5) +
+  tm_layout(
+    main.title = "EHSA Map",
+    main.title.size = 1.2,
+    main.title.fontface = "bold"
+  )
+
+# Get one representative hexagon from each significant EHSA classification
+representative_hexagons <- ehsa_afternoon_sf %>%
+  st_drop_geometry() %>%
+  filter(classification != "no pattern detected") %>%
+  group_by(classification) %>%
+  slice(1) %>%
+  ungroup() %>%
+  select(HEX_ID, classification)
+
+# Extract Gi* trends for these hexagons
+hex_trends <- gi_afternoon %>%
+  st_drop_geometry() %>%
+  filter(HEX_ID %in% representative_hexagons$HEX_ID) %>%
+  select(HEX_ID, HOUR_OF_DAY, gi_star) %>%
+  left_join(representative_hexagons, by = "HEX_ID")
+
+# Create individual plots for each classification type
+plot_list <- list()
+
+for (class in unique(hex_trends$classification)) {
+  hex_data <- hex_trends %>% filter(classification == class)
+  hex_id <- unique(hex_data$HEX_ID)
+  
+  p <- ggplot(data = hex_data, aes(x = HOUR_OF_DAY, y = gi_star)) +
+    geom_line(color = ehsa_colors[class], linewidth = 1.2) +
+    geom_hline(yintercept = 0, linetype = "dashed", color = "grey50") +
+    labs(
+      title = paste0(class, "\n(", hex_id, ")"),
+      x = "Hour of Day",
+      y = "Gi*"
+    ) +
+    theme_minimal() +
+    theme(
+      plot.title = element_text(face = "bold", size = 10, hjust = 0.5),
+      axis.title = element_text(size = 9),
+      axis.text = element_text(size = 8)
+    )
+  
+  plot_list[[class]] <- p
+}
+
+# Combine trend plots
+combined_trends <- wrap_plots(plot_list, ncol = 2) +
+  plot_annotation(
+    title = "Gi* Trends by EHSA Classification",
+    theme = theme(
+      plot.title = element_text(face = "bold", size = 12, hjust = 0.5)
+    )
+  )
+
+# Convert tmap to grob
+ehsa_map_grob <- tmap_grob(ehsa_map)
+
+# Combine map and trends side by side
+final_plot <- plot_grid(
+  ehsa_map_grob,
+  combined_trends,
+  ncol = 2,
+  rel_widths = c(1, 1),
+  labels = NULL
+)
+
+# Add overall title
+title <- ggdraw() + 
+  draw_label(
+    "Emerging Hot Spot Analysis (EHSA) – Weekday Afternoon (5–10pm)",
+    fontface = 'bold',
+    size = 15,
+    x = 0.5,
+    hjust = 0.5
+  )
+
+# Combine title with plots
+final_combined <- plot_grid(
+  title,
+  final_plot,
+  ncol = 1,
+  rel_heights = c(0.05, 0.95)
+)
+
+final_combined
 ```
 
-The EHSA map for weekday afternoon peak (4–9pm) shows that consecutive hotspots (red) are concentrated in the central zone, suggesting consistent high bus demand during the afternoon peak, likely linked to commuting flows toward employment and mixed-use hubs. Surrounding these, sporadic hotspots (peach) appear, reflecting irregular but recurring surges in demand. On the other hand, new coldspots (teal) are scattered along the periphery, marking emerging zones of consistently lower demand. Importantly, no consecutive coldspots are observed, implying that while some low-demand areas exist, they are not stable or spatially persistent. Overall, the map highlights a pattern where central urban areas serve as focal points of afternoon demand, while peripheral regions show weaker and less structured clustering.
+The EHSA analysis reveals distinct spatial and temporal clustering patterns of weekday afternoon bus trips (5-10pm), showing markedly different characteristics from morning peaks. The map (left) displays blue coldspots scattered across western, northern, and peripheral planning areas, indicating persistently low evening trip generation zones. Red and orange hotspots appear more fragmented and dispersed across central and eastern regions, representing areas with elevated afternoon demand. However, these hotspots are notably less concentrated and extensive than morning patterns, reflecting the decentralized nature of evening commuter flows as workers return from centralized employment hubs to diverse residential locations.
 
+The Gi* trend plots (right) demonstrate diverse temporal behaviors across classifications, revealing how clustering intensity evolves throughout the evening period. Consecutive hotspots (red, H0333) maintain strongly positive Gi* values (3-6) throughout the 5-10pm window, showing stable high-demand zones during return-commute hours at major residential destinations. Sporadic hotspots (orange, H0033) exhibit fluctuating positive values (2-4), suggesting intermittent clustering behavior as evening travel disperses across multiple activity centers and residential areas.
+
+Persistent coldspots (dark blue, H0002) remain consistently negative (-0.5 to -1.0), confirming stable low-demand areas throughout the period in peripheral or non-residential zones. Consecutive coldspots (light blue, H0005) show declining Gi* values (from -0.5 to -1.0), indicating areas becoming increasingly isolated as evening activity diminishes. New coldspots (H0153) emerge with declining trends, representing areas that develop low-demand patterns specifically during evening hours. Sporadic coldspots (H0001) fluctuate near zero, reflecting irregular and unpredictable patterns.
+
+Overall, the afternoon analysis demonstrates more fragmented spatial patterns and greater temporal variability compared to concentrated morning peaks. Certain planning areas exhibit stable, predictable patterns (consecutive/persistent classifications), while others show irregular, time-varying behaviors (sporadic classifications).
 
 # 6 Weekend/holiday
 
@@ -1265,6 +1779,8 @@ tm_shape(mpsz) +
     )
   ) +
   tm_borders(col = "grey40", lwd = 0.5) +
+  tm_shape(mpsz_area) +
+  tm_borders(col = "black", lwd = 0.2) +
   tm_title("Distribution of Bus Trips - Weekend/holiday (11am-8pm)") +
   tm_compass(position = tm_pos_in("left", "top")) +
   tm_scale_bar(position = tm_pos_in("left", "bottom"))
@@ -1279,61 +1795,135 @@ Overall, the spatial distribution suggests that weekend and holiday bus demand i
 ### Trip Distribution
 
 ```{r}
-mean_trips <- mean(weekend$TRIPS)
-median_trips <- median(weekend$TRIPS)
-q75 <- quantile(weekend$TRIPS, 0.75)
-q95 <- quantile(weekend$TRIPS, 0.95)
+# Filter out zero trips
+weekend_filtered <- weekend %>% filter(TRIPS > 0)
 
-ggplot(weekend, aes(x = TRIPS)) +
+# Calculate statistics for filtered data
+mean_trips <- mean(weekend_filtered$TRIPS)
+median_trips <- median(weekend_filtered$TRIPS)
+q95 <- quantile(weekend_filtered$TRIPS, 0.95)
+
+# Plot 1: Original scale histogram (cut off at 95th percentile)
+x_limit <- q95
+p1 <- ggplot(weekend_filtered, aes(x = TRIPS)) +
   geom_histogram(bins = 50, fill = "steelblue", color = "white", alpha = 0.8) +
   geom_vline(aes(xintercept = mean_trips), 
-             color = "red", linetype = "dashed", size = 1) +
+             color = "red", linetype = "dashed", linewidth = 0.8) +
   geom_vline(aes(xintercept = median_trips), 
-             color = "orange", linetype = "dashed", size = 1) +
-  annotate("text", x = mean_trips * 1.15, y = Inf, 
-           label = paste0("Mean: ", round(mean_trips, 0)), 
-           vjust = 1.5, color = "red", size = 3.5, fontface = "bold") +
-  annotate("text", x = median_trips * 0.85, y = Inf, 
-           label = paste0("Median: ", round(median_trips, 0)), 
-           vjust = 3, color = "orange", size = 3.5, fontface = "bold") +
-  coord_cartesian(xlim = c(0, 240000)) +
+             color = "orange", linetype = "dashed", linewidth = 0.8) +
+  annotate("text", x = mean_trips, y = Inf, 
+           label = paste0("Mean: ", format(round(mean_trips, 0), big.mark = ",")), 
+           vjust = 1.5, hjust = -0.1, color = "red", size = 3.5, fontface = "bold") +
+  annotate("text", x = median_trips, y = Inf, 
+           label = paste0("Median: ", format(round(median_trips, 0), big.mark = ",")), 
+           vjust = 3, hjust = -0.1, color = "orange", size = 3.5, fontface = "bold") +
   scale_x_continuous(
     labels = label_number(scale = 1/1000, suffix = "k"),
-    breaks = seq(0, 240000, by = 40000)  # 0k, 40k, 80k, 120k, 160k, 200k, 240k
+    breaks = seq(0, x_limit, by = 20000),
+    limits = c(0, x_limit),
+    expand = expansion(mult = c(0.02, 0.05))
   ) +
-  scale_y_continuous(labels = comma) +
+  scale_y_continuous(labels = comma, expand = expansion(mult = c(0, 0.1))) +
   labs(
-    title = "Distribution of Trip Counts - Weekend/holiday (11am-8pm)",
-    subtitle = paste0("n = ", nrow(weekend), " hexagons | 95th percentile: ", 
-                     round(q95, 0), " trips"),
-    x = "Number of Trips (Thousands)",
-    y = "Frequency (Number of Hexagons)"
+    title = "0-95th Percentile",
+    x = "Number of Trips",
+    y = "Frequency",
+    caption = paste0("95th percentile: ", format(round(q95, 0), big.mark = ","), " trips")
   ) +
-  theme_minimal() +
+  theme_minimal(base_size = 11) +
   theme(
-    plot.title = element_text(face = "bold", size = 14),
-    plot.subtitle = element_text(size = 10, color = "gray40"),
-    axis.title = element_text(size = 11),
-    panel.grid.minor = element_blank()
+    plot.title = element_text(face = "bold", size = 13, hjust = 0.5),
+    axis.title = element_text(size = 10),
+    axis.text.x = element_text(angle = 0, hjust = 0.5, size = 9),
+    panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_line(color = "gray90"),
+    plot.margin = margin(10, 5, 10, 10),
+    plot.caption = element_text(size = 8, color = "gray50", hjust = 1, face = "italic")
   )
+
+# Plot 2: Bar chart for 95th-100th percentile (top 5%)
+top5_data <- weekend_filtered %>% filter(TRIPS >= q95)
+
+p2 <- ggplot(top5_data, aes(x = TRIPS)) +
+  geom_histogram(bins = 25, fill = "coral", color = "white", alpha = 0.8) +
+  scale_x_continuous(
+    labels = label_number(scale = 1/1000, suffix = "k"),
+    expand = expansion(mult = c(0.02, 0.05))
+  ) +
+  scale_y_continuous(labels = comma, expand = expansion(mult = c(0, 0.1))) +
+  labs(
+    title = "Top 5%",
+    x = "Number of Trips",
+    y = "Frequency",
+    caption = paste0("n = ", nrow(top5_data), " hexagons | Max: ", 
+                    format(max(top5_data$TRIPS), big.mark = ","))
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    plot.title = element_text(face = "bold", size = 13, hjust = 0.5),
+    axis.title = element_text(size = 10),
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 9),
+    panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_line(color = "gray90"),
+    plot.margin = margin(10, 5, 10, 5),
+    plot.caption = element_text(size = 8, color = "gray50", hjust = 0.5)
+  )
+
+# Plot 3: Log transformation
+p3 <- ggplot(weekend_filtered, aes(x = log10(TRIPS))) +
+  geom_histogram(bins = 50, fill = "darkgreen", color = "white", alpha = 0.8) +
+  scale_x_continuous(
+    breaks = 0:5,
+    labels = c("1", "10", "100", "1k", "10k", "100k"),
+    expand = expansion(mult = c(0.02, 0.05))
+  ) +
+  scale_y_continuous(labels = comma, expand = expansion(mult = c(0, 0.1))) +
+  labs(
+    title = "Log10 Transformed",
+    x = "Number of Trips (Log Scale)",
+    y = "Frequency",
+    caption = "Distribution shape across all magnitudes"
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    plot.title = element_text(face = "bold", size = 13, hjust = 0.5),
+    axis.title = element_text(size = 10),
+    axis.text.x = element_text(size = 9),
+    panel.grid.minor = element_blank(),
+    panel.grid.major.x = element_line(color = "gray90"),
+    plot.margin = margin(10, 10, 10, 5),
+    plot.caption = element_text(size = 8, color = "gray50", hjust = 0.5)
+  )
+
+# Combine plots with adjusted widths
+combined_plot <- p1 + p2 + p3 + 
+  plot_layout(widths = c(2.5, 1.5, 2.5)) +
+  plot_annotation(
+    title = "Distribution of Trip Counts - Weekend/holiday (11am-8pm)",
+    subtitle = paste0("n = ", format(nrow(weekend_filtered), big.mark = ","), 
+                     " hexagons (zeros excluded)"),
+    theme = theme(
+      plot.title = element_text(face = "bold", size = 15, hjust = 0.5),
+      plot.subtitle = element_text(size = 11, color = "gray40", hjust = 0.5)
+    )
+  )
+
+combined_plot
 ```
 
-The histogram of trip counts during weekends and holidays (11am–8pm) shows a strongly right-skewed distribution. The majority of hexagons record relatively low trip volumes, with the median trip count at 11,742, indicating that half of the areas experience modest demand. However, the mean is much higher at 25,297, reflecting the influence of a small number of locations with very high passenger volumes. The 95th percentile reaches 89,450 trips, and a few hexagons far exceed this threshold, with maximum counts surpassing 200,000 trips.
+This three-panel visualization reveals a highly right-skewed distribution of weekend/holiday trips (11am-8pm) across 824 hexagonal zones in the study area. The main distribution (0-95th percentile) shows that the majority of hexagons have relatively low trip counts, with a median of 11,442 trips and mean of 25,297 trips. The substantial gap between median and mean indicates strong positive skew, suggesting most areas experience moderate weekend traffic while a few zones generate disproportionately high trip volumes. The distribution shows a sharp peak near zero with a long tail extending rightward, similar to weekday patterns but with notably lower central values, reflecting reduced overall transit demand during weekends and holidays.
 
-This pattern highlights that while most areas have low-to-moderate weekend travel activity, a limited number of high-demand hubs dominate overall bus flows. The skew underscores an uneven demand distribution, where weekend and holiday travel is more dispersed compared to weekday commuting but still driven by concentrated hotspots of activity.
+The top 5% panel highlights the extreme values, where only 42 hexagons exceed the 95th percentile threshold of 89,450 trips, with the maximum reaching 369,851 trips. Notably, both the mean (25,297) and 95th percentile (89,450) are substantially lower than weekday patterns, confirming reduced commuter-driven demand. However, the maximum (369,851) remains high, suggesting certain weekend destinations attract concentrated visitor flows.
+
+The log-transformed view reveals a more normalized, approximately bell-shaped distribution, confirming the underlying data follows a log-normal distribution typical for spatial phenomena. The pattern demonstrates that weekend trip generation spans multiple orders of magnitude, reflecting diverse urban zones from quiet residential neighborhoods to major leisure, retail, and recreational activity centers experiencing peak weekend demand.
 
 ## 6.2 Local Indicators of Spatial Association(LISA)
 
+The code below computes Local Moran’s I for TRIPS in the weekend/holiday hexagons (11am–8pm), using a distance-band neighbor list at 1984.313 meters.
+
 ```{r}
-critical_dist <- critical_threshold(st_geometry(weekend))
-
-nb <- st_dist_band(
-  st_geometry(weekend),
-  upper = critical_dist)
-
-n_neighbors <- lengths(nb)
-
-wt <- st_weights(nb, style = "W")
+nb <- st_dist_band(st_geometry(weekend), upper = critical_dist)
+wt <- st_weights(nb, style = "W", allow_zero = TRUE)
 
 # Compute Local Moran's I
 set.seed(1234)
@@ -1343,17 +1933,19 @@ lisa_weekend <- weekend %>%
       TRIPS, nb, wt, nsim = 99), 
     .before = 1) %>%
   unnest(local_moran)
-
-glimpse(lisa_weekend)
 ```
 
-### Local Moran’s I values and p-values
+### Local Moran’s I values
 
 ```{r}
-ii_map <- tm_shape(mpsz) +
-  tm_polygons(col = "grey90", border.col = "white") +  
+# Filter for significant Local Moran's I (p-value < 0.1)
+lisa_weekend_sig <- lisa_weekend %>%
+  filter(p_ii < 0.1)
 
-  tm_shape(lisa_weekend) +
+# Create the Local Moran's I map
+ii_map <- tm_shape(mpsz) +
+  tm_polygons(col = "grey90", border.col = "white") +
+  tm_shape(lisa_weekend_sig) +
   tm_polygons(fill = "ii",
               fill.scale = tm_scale_intervals(
                 style = "pretty",
@@ -1362,42 +1954,31 @@ ii_map <- tm_shape(mpsz) +
               ),
               fill.legend = tm_legend(
                 title = "Local Moran's I",
-                position = tm_pos_in("right", "bottom")
+                position = tm_pos_in("right", "bottom"),
+                title.size = 0.8,
+                text.size = 0.7
               )
   ) +
   tm_borders(col = "grey40", lwd = 0.5) +
-  tm_title("Local Moran's I - weekend/holiday peak")
+  tm_shape(mpsz_area) +
+  tm_borders(col = "grey30", lwd = 0.2) +
+  tm_title("Local Moran's I - Weekend/holiday (p-value < 0.1)") +
+  tm_compass(position = tm_pos_in("left", "top")) +
+  tm_scale_bar(position = tm_pos_in("left", "bottom"))
 
-p_ii_map <- tm_shape(mpsz) +
-  tm_polygons(col = "grey90", border.col = "white") +
-
-  tm_shape(lisa_weekend) +
-  tm_polygons(fill = "p_ii",
-              fill.scale = tm_scale_intervals(
-                breaks = c(-Inf, 0.001, 0.01, 0.05, 0.1, Inf),
-                values = "-brewer.Reds"
-              ),
-              fill.legend = tm_legend(
-                title = "p-value",
-                position = tm_pos_in("right", "bottom")
-              )
-  ) +
-  tm_borders(col = "grey40", lwd = 0.5) +
-  tm_title("p-values of Local Moran's I")
-
-tmap_arrange(ii_map, p_ii_map, asp = 1, ncol = 2)
+# Display the map
+ii_map
 ```
 
-The Local Moran's I analysis for the weekend/holiday peak reveals moderate spatial clustering patterns driven by leisure and non-work trips.
+The Local Moran's I map reveals significant spatial clustering patterns of bus trip generation during weekend/holiday periods (11am-8pm), with only statistically significant results (p < 0.1) displayed. Positive spatial autocorrelation (blue hexagons, values 0.5-3) appears notably scattered and fragmented across the island, concentrated primarily in western, central, and selected eastern planning areas. These high-high clusters indicate areas where high trip volumes are surrounded by similarly high-activity neighbors, representing recreational destinations, shopping districts, or leisure zones attracting concentrated weekend visitor flows rather than commuter-driven patterns.
 
-The left map shows light blue areas (1 to 2) indicating moderate High-High clusters distributed across central, northeastern, western, and southern regions, where high trip counts cluster together, reflecting shopping and recreational travel to malls and town centers. Light orange shades (-1 to 0) represent weak clustering or spatial outliers in peripheral areas. Notably, clustering is less concentrated than weekday patterns, with activity more evenly dispersed across the island.
-The right map displays statistical significance through p-values. Dark red shades (p < 0.001 to 0.01) confirm highly significant clusters in central, northern, northeastern, and western zones, while pale areas (p > 0.05) indicate no significant clustering in suburban regions.
+Moderate positive clusters (light blue, 0-1) appear sparsely dispersed across various planning areas, suggesting highly fragmented weekend clustering patterns distinct from weekday commuter flows. Notably, negative spatial autocorrelation (orange to red, -1 to 0) appears extensively throughout the island, particularly in northern, central, and peripheral regions. These represent spatial outliers—either high-activity leisure destinations surrounded by low-activity residential neighbors (high-low outliers) or vice versa (low-high outliers)—indicating transitional boundaries between recreational hubs and residential zones, or isolated weekend activity centers.
 
-Overall, weekend/holiday patterns show moderate spatial autocorrelation shaped by diverse leisure destinations. Unlike the commuter-driven weekday morning peak with concentrated hotspots, weekend activity is more dispersed.
+The weekend pattern differs fundamentally from weekday patterns, showing minimal concentrated clustering as leisure travel disperses across diverse recreational, retail, and tourist destinations rather than following predictable commuter routes. The highly fragmented spatial structure reflects Singapore's diverse weekend activity landscape and varied leisure travel behaviors, with some areas forming weekend attraction clusters while most exhibit irregular, destination-specific demand.
 
 ### Moran scatterplot with standardised variable
 
-```{r}
+```{r fig.width=10, fig.height=6}
 lisa_weekend <- lisa_weekend %>%
   mutate(lag_TRIPS = st_lag(
     TRIPS, nb, wt),
@@ -1409,11 +1990,12 @@ lisa_weekend <- lisa_weekend %>%
          z_lag_TRIPS = scale(lag_TRIPS),
          .before = 1)
 
-ggplot(data = lisa_weekend,
+# Create the Moran scatterplot
+moran_plot <- ggplot(data = lisa_weekend,
        aes(x = z_TRIPS,
            y = z_lag_TRIPS,
            color = mean)) +
-  geom_point(size = 2) +
+  geom_point(size = 2, alpha = 0.6) +
   geom_smooth(method = "lm",
               se = FALSE,
               color = "black") +
@@ -1427,41 +2009,91 @@ ggplot(data = lisa_weekend,
   labs(x = "Standardised TRIPS",
        y = "Standardised Spatial Lag of TRIPS",
        title = "Standardised Moran Scatterplot with LISA Quadrants") +
-  theme_minimal()
+  theme_minimal() +
+  theme(legend.position = "bottom")
+
+# Create the bar chart for quadrant counts
+quadrant_counts <- lisa_weekend %>%
+  st_drop_geometry() %>%
+  count(mean) %>%
+  mutate(mean = factor(mean, levels = c("High-High", "Low-High", 
+                                         "Low-Low", "High-Low")))
+
+bar_plot <- ggplot(quadrant_counts, aes(x = mean, y = n, fill = mean)) +
+  geom_bar(stat = "identity", alpha = 0.8) +
+  geom_text(aes(label = n), vjust = -0.5, size = 4, fontface = "bold") +
+  scale_fill_manual(
+    values = c("High-High" = "red",
+               "Low-Low" = "blue",
+               "Low-High" = "lightblue",
+               "High-Low" = "pink")) +
+  labs(x = "LISA Quadrant",
+       y = "Count of Hexagons",
+       title = "Count by Quadrant") +
+  theme_minimal() +
+  theme(legend.position = "none",
+        axis.text.x = element_text(angle = 45, hjust = 1))
+
+# Combine plots side by side
+combined_plot <- moran_plot + bar_plot + 
+  plot_layout(widths = c(2, 1)) +
+  plot_annotation(
+    title = "Local Moran's I Analysis - Weekend/holiday",
+    theme = theme(plot.title = element_text(face = "bold", size = 14, hjust = 0.5))
+  )
+
+combined_plot
 ```
 
-The Moran scatterplot for weekend/holiday trips reveals moderate positive spatial autocorrelation with a more balanced and dispersed distribution compared to weekday patterns.
+The Moran scatterplot reveals distinct spatial patterns in weekend/holiday bus trips, with the bar chart quantifying the distribution across LISA quadrants. The Low-Low quadrant (dark blue, 339 hexagons) dominates most strongly, representing cold spots where low-trip hexagons cluster together in peripheral or less populated regions, exhibiting strong positive spatial autocorrelation. This is the highest across all periods analyzed, reflecting reduced overall transit demand during weekends and holidays when commuter-driven patterns are absent.
 
-The High-High quadrant (red) shows a wider spread of points across different standardized trip levels, indicating that high-demand clusters are less tightly concentrated and more evenly distributed across multiple leisure destinations including shopping districts, recreational zones, and town centers. This reflects the diverse nature of weekend travel with various trip purposes rather than concentrated commuter flows.
+The Low-High quadrant (light blue, 222 hexagons) remains substantial, representing underperforming hexagons within busier regions. This indicates considerable negative spatial autocorrelation where low-activity residential areas neighbor high-activity leisure destinations, reflecting transitional zones and spatial heterogeneity as weekend travelers concentrate at specific recreational, retail, or tourist hubs rather than dispersing across residential zones.
 
-The Low-Low quadrant (dark blue) remains densely populated, confirming persistent low-activity zones in peripheral areas. Notably, the Low-High quadrant (light blue) shows more visible points than weekday patterns, suggesting areas of emerging activity embedded within moderately busy regions—possibly secondary retail or recreational spots.
+The High-High quadrant (red, 217 hexagons) shows moderate clustering—high-trip hexagons surrounded by similarly high-trip neighbors at major weekend destinations like shopping districts, recreational areas, and tourist attractions. This differs fundamentally from weekday patterns, reflecting leisure-driven rather than employment-related clustering. The High-Low quadrant (pink, 46 hexagons) contains minimal outliers—isolated high-trip leisure destinations surrounded by low-activity surroundings.
 
-The moderate positive slope indicates that while spatial clustering exists, it is less pronounced than morning peak, reflecting the decentralized and multipurpose nature of weekend/holiday travel. Overall, the scatterplot confirms that weekend bus demand exhibits systematic but diffused spatial patterns
+The positive regression slope confirms overall positive spatial autocorrelation, though the distribution reveals greater spatial complexity in weekend travel patterns. The dominance of Low-Low clusters (339 of 824 hexagons, 41%) alongside substantial Low-High outliers reflects Singapore's fragmented weekend travel landscape, with concentrated activity at specific leisure destinations contrasting sharply with widespread low-demand residential and peripheral areas lacking weekend commuter flows.
 
 ### LISA Map
 
-```{r}
-lisa_sig <- lisa_weekend %>%
-  filter(p_ii < 0.05)
+```{r fig.width=12, fig.height=5}
+# Count significant quadrants
+quadrant_counts <- lisa_weekend_sig %>%
+  st_drop_geometry() %>%
+  count(mean) %>%
+  mutate(mean = factor(mean, levels = c("High-High", "Low-High", 
+                                         "Low-Low", "High-Low")))
 
+# Bar chart
+bar_chart <- ggplot(quadrant_counts, aes(x = mean, y = n, fill = mean)) +
+  geom_bar(stat = "identity", width = 0.7) +
+  geom_text(aes(label = n), vjust = -0.3, size = 5, fontface = "bold") +
+  scale_fill_manual(
+    values = c("High-High" = "red",
+               "Low-Low" = "blue",
+               "Low-High" = "lightblue",
+               "High-Low" = "pink")) +
+  scale_y_continuous(expand = expansion(mult = c(0, 0.15))) +
+  labs(x = "LISA Quadrant", 
+       y = "Count of Hexagons", 
+       title = "LISA Quadrant Counts") +
+  theme_minimal() +
+  theme(
+    legend.position = "none",
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 11),
+    axis.text.y = element_text(size = 11),
+    axis.title = element_text(size = 12, face = "bold"),
+    plot.title = element_text(size = 13, face = "bold", hjust = 0.5),
+    panel.grid.major.x = element_blank(),
+    panel.grid.minor = element_blank(),
+    plot.margin = margin(10, 10, 10, 10)
+  )
+
+# LISA map
 tmap_mode("plot")
-
-tm_shape(mpsz) +
+lisa_map <- tm_shape(mpsz) +
   tm_polygons(col = "grey90", border.col = "white") +
   
-  tm_shape(lisa_weekend) +
-  tm_polygons(fill = "TRIPS",
-              fill.scale = tm_scale_continuous(
-                values = "greys"
-              ),
-              fill.legend = tm_legend(
-                title = "Total TRIPS",
-                position = tm_pos_in("right", "bottom")
-              )
-  ) +
-  tm_borders(col = "grey40", lwd = 0.5) +
-  
-  tm_shape(lisa_sig) +
+  tm_shape(lisa_weekend_sig) +
   tm_polygons(fill = "mean",
               fill.scale = tm_scale_categorical(
                 values = c("High-High" = "red",
@@ -1470,33 +2102,71 @@ tm_shape(mpsz) +
                           "High-Low" = "pink")
               ),
               fill.legend = tm_legend(
-                title = "LISA Quadrants (p < 0.05)",
-                position = tm_pos_in("left", "bottom")
+                title = "LISA Quadrants",
+                position = tm_pos_in("right", "bottom")
               )
   ) +
   tm_borders(col = "black", lwd = 0.5) +
-  tm_title("LISA Map - Weekend/Holiday (11am-8pm)")
+  tm_shape(mpsz_area) +
+  tm_borders(col = "grey30", lwd = 1.5) +
+  tm_layout(
+    main.title = "LISA Map (p-value < 0.1)",
+    main.title.size = 1.2,
+    main.title.fontface = "bold",
+    legend.text.size = 0.8,
+    legend.title.size = 1,
+    inner.margins = c(0.05, 0.05, 0.05, 0.05)
+  )
+
+# Convert tmap to grob
+lisa_map_grob <- tmap_grob(lisa_map)
+
+# Combine
+combined_plot <- plot_grid(
+  lisa_map_grob, 
+  bar_chart, 
+  ncol = 2, 
+  rel_widths = c(2,1.5),
+  labels = NULL
+)
+
+title <- ggdraw() + 
+  draw_label(
+    "Local Indicators of Spatial Association (LISA) - Weekend/holiday",
+    fontface = 'bold',
+    size = 15,
+    x = 0.5,
+    hjust = 0.5
+  )
+
+final_plot <- plot_grid(
+  title, 
+  combined_plot,
+  ncol = 1,
+  rel_heights = c(0.06, 0.94)
+)
+
+final_plot
 ```
 
-The LISA map for weekend/holiday trips highlights clear clustering patterns in bus demand across Singapore. High-High clusters (red) are concentrated in central, northeastern, and selected western regions, where hexagons with high trip counts are surrounded by other high-demand cells. These hotspots likely reflect popular destinations such as shopping centres, entertainment hubs, and large residential estates that attract strong weekend activity. In contrast, Low-Low clusters (dark blue) are evident in the western and peripheral areas, indicating consistent zones of low demand, often linked to industrial or less connected estates.
+The LISA map reveals significantly different spatial clustering patterns for weekday afternoon bus trips compared to morning peaks. The distribution is remarkably balanced, with High-High clusters (red, 68 hexagons), Low-High outliers (light blue, 69 hexagons), and Low-Low clusters (dark blue, 69 hexagons) nearly equal in number. This contrasts sharply with morning patterns where Low-Low and High-High dominated, indicating greater spatial heterogeneity in afternoon travel.
 
-A few outliers, including Low-High and High-Low hexagons, appear along cluster edges, showing transitional zones where demand changes abruptly between adjacent areas. Their presence reflects local heterogeneity, where differences in land use or accessibility create contrasting demand within small spatial boundaries.
+High-High clusters appear more scattered across northern, central, and eastern planning areas, representing residential zones receiving concentrated return commuter flows. However, their reduced prevalence (68 vs 145 morning) reflects more dispersed evening destination patterns. Low-Low clusters remain present in peripheral and less populated regions but are substantially fewer (69 vs 150 morning), suggesting broader spatial distribution of afternoon activity.
 
-Overall, the weekend/holiday LISA map confirms that bus trips are not evenly distributed but exhibit strong spatial clustering. Hotspots align with leisure, retail, and dense housing areas, while coldspots dominate less central zones. This pattern underscores the shift in travel behaviour on weekends and holidays, where demand is shaped more by leisure and retail trips than by work-related commuting flows.
+The dramatic increase in Low-High outliers (69 vs 78 morning) indicates extensive spatial mixing where low-activity hexagons neighbor high-activity areas, reflecting transitional zones and fragmented clustering as evening commuters disperse from centralized employment hubs to diverse residential locations. High-Low outliers remain minimal (4 hexagons).
+
+The balanced quadrant distribution reveals weaker positive spatial autocorrelation and greater spatial complexity compared to morning peaks. This reflects Singapore's polycentric structure and varied evening travel behaviors, with afternoon trip patterns exhibiting more decentralized, heterogeneous spatial organization.
 
 ## 6.3 Hot Spots and Cold Spots Analysis (HCSA)
 
-### Gi* values and p-values
+The code below builds a fixed distance–band neighbourhood for each weekend/holiday hexagon, creates row-standardised spatial weights, and then computes the Local Getis-Ord Gi* statistic for TRIPS.
 
 ```{r}
-# Compute fixed distance weight matrix
-ct <- critical_threshold(st_geometry(weekend))
-
 weekend_fdw <- weekend %>%
   mutate(nb = include_self(
     st_dist_band(
       st_geometry(geometry),
-      upper = ct)),
+      upper = critical_dist)),
     wt = st_weights(nb,
                     style = "W"),
     .before = 1)
@@ -1510,12 +2180,18 @@ HCSA_fdw <- weekend_fdw %>%
       TRIPS, nb, wt, nsim = 99),
     .before = 1) %>%
   unnest(gistar)
+```
 
-# Plot Gi* values
+```{r}
+# Filter for significant Gi* values (p < 0.1)
+HCSA_sig <- HCSA_fdw %>%
+  filter(p_sim < 0.1)
+
+# Plot Gi* values for significant hexagons only
 Gi_star_map <- tm_shape(mpsz) +
   tm_polygons(col = "grey90", border.col = "white") +
   
-  tm_shape(HCSA_fdw) +
+  tm_shape(HCSA_sig) +
   tm_polygons(fill = "gi_star",
               fill.scale = tm_scale_intervals(
                 style = "pretty",
@@ -1523,64 +2199,49 @@ Gi_star_map <- tm_shape(mpsz) +
                 values = "-brewer.rd_bu"),
               fill.legend = tm_legend(
                 title = "local Gi*",
-                position = tm_pos_in(
-                  "right", "bottom"))) +
+                position = tm_pos_in("right", "bottom")
+              )
+  ) +
   tm_borders(col = "grey40", lwd = 0.5) +
-  tm_title("Local Gi* of TRIPS")
+  tm_shape(mpsz_area) +
+  tm_borders(col = "grey30", lwd = 0.2) +
+  tm_title("Local Gi* of TRIPS (p-value < 0.1)") +
+  tm_compass(position = tm_pos_in("left", "top")) +
+  tm_scale_bar(position = tm_pos_in("left", "bottom"))
 
-# Plot p-values
-p_values_map <- tm_shape(mpsz) +
-  tm_polygons(col = "grey90", border.col = "white") +
-  
-  tm_shape(HCSA_fdw) +
-  tm_polygons(fill = "p_sim",
-              fill.scale = tm_scale_intervals(
-                breaks = c(0, 0.001, 0.01, 0.05, 0.1, 1),
-                values = "-brewer.reds"),
-              fill.legend = tm_legend(
-                title = "p-value",
-                position = tm_pos_in("right", "bottom"))) +
-  tm_borders(col = "grey40", lwd = 0.5) +
-  tm_title("p-values of local Gi* of TRIPS")
-
-tmap_arrange(Gi_star_map, p_values_map, asp = 1, ncol = 2)
-```
-
-The Local Gi* analysis for weekend and holiday trips (left map) reveals clear clustering of demand across Singapore. Strong hotspots (red shades) are concentrated in the central, northeastern, and selected western regions, where trip volumes are significantly higher than in surrounding areas. These likely correspond to major residential estates, recreational hubs, or transport interchanges that attract higher passenger flows during non-working days. In contrast, coldspots (blue shades) appear mainly in the west and northwestern periphery, where consistently lower trip counts suggest weaker demand, possibly reflecting less populated or industrial zones.
-
-The p-value map (right) confirms the statistical robustness of these clusters. Many of the identified hotspots and coldspots overlap with dark red areas (<0.05), meaning their clustering is unlikely to be random. Peripheral areas with lighter shades show weaker or insignificant clustering, indicating more dispersed or inconsistent demand patterns.
-
-Overall, the weekend/holiday maps highlight that trip demand is unevenly distributed but strongly structured around key hubs. Hotspots align with central and residential corridors where leisure and social activities drive bus usage, while coldspots dominate the periphery. This reflects a spatially concentrated but systematic pattern of non-work travel demand
-
-### HCSA Map
-
-```{r}
-# HCSA cluster classification
+# HCSA cluster classification with p < 0.1
 HCSA_fdw <- HCSA_fdw %>%
   mutate(HCSA_cluster = case_when(
-    p_sim > 0.05 ~ "Insignificant",
-    p_sim <= 0.05 & cluster == "High" ~ "Hot spot",
-    p_sim <= 0.05 & cluster == "Low" ~ "Cold spot",
+    p_sim <= 0.1 & cluster == "High" ~ "Hot spot",
+    p_sim <= 0.1 & cluster == "Low" ~ "Cold spot",
     TRUE ~ "Other"),
     HCSA_cluster = factor(
       HCSA_cluster,
-      levels = c("Insignificant", "Hot spot", "Cold spot")
+      levels = c("Hot spot", "Cold spot")  # Reordered levels
     ),
     .before = 1
   )
 
-# Plot HCSA cluster map
+# Filter to keep only significant hexagons
+HCSA_sig <- HCSA_fdw %>%
+  filter(HCSA_cluster != "Insignificant")
+
+# Aggregate mpsz by PLN_AREA_N to get planning area boundaries
+mpsz_planning <- mpsz %>%
+  group_by(PLN_AREA_N) %>%
+  summarise(geometry = st_union(geometry))
+
+# HCSA cluster map
 HCSA_map <- tm_shape(mpsz) +
   tm_polygons(col = "grey90", border.col = "white") +
   
-  tm_shape(HCSA_fdw) +
+  tm_shape(HCSA_sig) +
   tm_polygons(
     fill = "HCSA_cluster",
     fill.scale = tm_scale_categorical(
       values = c(
-        "grey80",  # Insignificant
-        "red",     # Hot spot
-        "blue"     # Cold spot
+        "Hot spot" = "red",
+        "Cold spot" = "blue"
       )
     ),
     fill.legend = tm_legend(
@@ -1588,17 +2249,22 @@ HCSA_map <- tm_shape(mpsz) +
       position = tm_pos_in("right", "bottom"))
   ) +
   tm_borders(col = "grey40", lwd = 0.5) +
-  tm_title("HCSA Clusters (p < 0.05)")
+  tm_shape(mpsz_area) +
+  tm_borders(col = "grey30", lwd = 0.2) +
+  tm_title("HCSA Clusters (p-value < 0.1)")
 
-# Gi* map and HCSA map
 tmap_arrange(Gi_star_map, HCSA_map, asp = 1, ncol = 2)
 ```
 
-On the right map, significant cold spots (blue) are concentrated in the western and northern peripheries, reflecting consistently low demand in less populated or industrial zones. In contrast, hot spots (red) appear in central and northeastern areas, as well as selected pockets in the east, aligning with high-demand hubs such as residential estates, shopping districts, and transport interchanges that attract leisure and family trips during weekends. Grey hexagons dominate much of the map, indicating insignificant clusters where trip patterns are more dispersed and not statistically robust.
+The Local Gi* map identifies scattered hot spots (red/orange) across central, eastern, and selected northern regions indicating high weekend trip clustering intensity at major recreational destinations, shopping districts, and tourist attractions. Cold spots (blue) dominate western and peripheral areas with consistently low trips. The dispersed pattern suggests destination-specific intensity variations reflecting leisure-driven travel to concentrated activity hubs rather than origin-based residential commuter flows characteristic of weekdays.
 
-When considered with the Local Gi* map on the left, which depicts clustering intensity, the HCSA analysis provides a sharper focus by filtering for only statistically significant hot and cold spots. This combination reveals that while weekend demand is more spatially dispersed compared to weekday peaks, notable hotspots still emerge in urban centres and high-traffic nodes, whereas low-demand clusters are consistently found in peripheral regions. Overall, the results underscore that weekend bus trips are less uniformly tied to commuting patterns but are still structured around key leisure, residential, and transport activity zones.
+The HCSA Clusters map reveals statistically significant spatial clustering of weekend/holiday bus trips (p < 0.1), showing fundamentally different patterns from weekday periods. Hot spots (red) appear as scattered, moderately-sized clusters across northern, central, and eastern planning areas, representing major weekend destinations attracting concentrated visitor flows—shopping malls, recreational facilities, tourist attractions, and entertainment zones. These clusters are less extensive than weekday morning patterns but more defined than weekday afternoons, reflecting concentrated leisure activity at specific destinations. Cold spots (blue) remain prominent across western, peripheral, and predominantly residential regions, confirming spatial patterns of reduced weekend transit demand in areas lacking major recreational attractions.
+
+Together, the maps demonstrate destination-focused spatial organization in weekend trip generation compared to weekday patterns. The Gi* map shows clustering intensity at leisure hubs, while the HCSA map reveals moderate-sized, destination-specific hot spot clusters. 
 
 ## 6.4 Emerging Hot Spot Analysis (EHSA)
+
+The code below prepares weekend/holiday (11–20h) trips for Emerging Hot Spot/space–time analysis. It aggregates trips by hexagon × hour, then ensure every hexagon has all hours (filling missing cells with 0) and orders IDs/time consistently. It converts IDs and hours to the right types, then builds a space–time cube (spacetime) by linking the hourly table to the hexagon geometries, and finally checks that the result is a valid space–time cube.
 
 ```{r}
 hex_ids <- hexagon$HEX_ID
@@ -1625,6 +2291,8 @@ TRIPS_weekend_st <- spacetime(
 is_spacetime_cube(TRIPS_weekend_st) 
 ```
 
+The code below adds spatial neighbours/weights to the weekend/holiday space–time cube and computes hourly Local Getis-Ord Gi* for TRIPS. It then flattens the results so each hexagon–hour has a Gi* score and significance.
+
 ```{r}
 # Add neighbours and weights
 TRIPS_weekend_nb <- TRIPS_weekend_st %>%
@@ -1649,9 +2317,13 @@ gi_weekend <- TRIPS_weekend_nb %>%
 
 ### Mann-Kendall Test
 
+The code below tests whether each hexagon’s Gi* values show a monotonic time trend (consistently increasing or decreasing) across the selected hours.
+
 H0: No monotonic trend
 
 H1: Monotonic trend is present
+
+alpha: 0.1
 
 ```{r}
 mk_hotspots_weekend <- gi_weekend %>%
@@ -1671,31 +2343,11 @@ mk_hotspots_weekend_ranked <- mk_hotspots_weekend %>%
 mk_hotspots_weekend_ranked %>% slice(1:10)
 ```
 
-With reference to the results, we will reject the hypothesis null and infer that there is a downward trend.
-
-The Hex H0166 is selected to view the Gi* Trend for afternoon peak:
-
-```{r}
-hex_trend <- gi_weekend %>%
-  st_drop_geometry() %>%
-  filter(HEX_ID == "H0166") %>%
-  select(HEX_ID, HOUR_OF_DAY, gi_star)
-
-ggplot(data = hex_trend, aes(x = HOUR_OF_DAY, y = gi_star)) +
-  geom_line(color = "black") +
-  labs(
-    title = "Gi* Trend across Weekend/Holiday Hours — H0166",
-    x = "Hour of Day",
-    y = "Gi*"
-  ) +
-  theme_light()
-```
-
-The plot for Hex H0166 shows a clear downward trend in the Gi* statistic. At the start of the period (around 11am–12pm), Gi* values are high and positive, close to 2.0, indicating that this location is initially part of a strong hotspot with trip counts significantly higher than its surrounding areas. However, from midday onward, the Gi* values steadily decline, first stabilising between 1.0 and 0.8 around 2–4pm, before continuing to drop sharply after 5pm. By 8pm, the Gi* value reaches close to zero, suggesting the hotspot effect diminishes entirely.
-
-This declining trend indicates a monotonic decrease in spatial clustering strength at this location over the course of the day. The area starts as a robust hotspot during midday, likely linked to leisure, shopping, or recreational travel demand, but gradually loses its clustering significance into the evening. In practical terms, this suggests that bus trip intensity at this location aligns less with high-demand neighbours later in the day, reflecting a dispersal of travel patterns typical of weekends and holidays when activities become more spread across multiple destinations rather than concentrated in a single area.
+With reference to the results, as p-value < alpha, we will reject the null hypothesis and infer that there is a significant trend.
 
 ### Performing Emerging Hotspot Analysis
+
+The code below runs EHSA on the weekday–morning space-time cube to classify each hexagon into temporal hotspot/coldspot types.
 
 ```{r}
 set.seed(1234)
@@ -1706,20 +2358,26 @@ ehsa_weekend <- emerging_hotspot_analysis(
   k     = 1,      
   nsim  = 99   
 )
+```
 
+The code below attaches EHSA results back to the hexagon layer and keep only statistically significant cells for mapping.
+
+```{r}
 ehsa_weekend_sf <- hexagon %>%
   select(HEX_ID) %>%
   left_join(ehsa_weekend, by = c("HEX_ID" = "location")) %>%
-  filter(p_value < 0.05) %>%
+  filter(p_value < 0.1) %>%
   st_as_sf()
 ```
 
+The code below applies the consistent legend order and color scheme to the data before plotting.
 
 ```{r}
 ehsa_weekend$classification   <- factor(ehsa_weekend$classification,   levels = ehsa_levels)
 ehsa_weekend_sf$classification <- factor(ehsa_weekend_sf$classification, levels = ehsa_levels)
 ```
 
+#### Distribution of EHSA Classes
 
 ```{r}
 ggplot(data = ehsa_weekend, 
@@ -1738,28 +2396,127 @@ ggplot(data = ehsa_weekend,
   )
 ```
 
-Most hexagons fall under no pattern detected, suggesting that demand clustering is absent across much of the city during these hours. However, a notable share of hexagons are identified as persistent coldspots and sporadic coldspots, indicating consistent or irregularly low trip counts. Sporadic hotspots also appear in meaningful numbers, pointing to localized and irregular bursts of higher demand that may be tied to leisure activities, shopping trips, or recreational destinations. Meanwhile, persistent hotspots are few, and consecutive hotspots are almost absent, showing that stable high-demand clusters are rare during weekends and holidays.
+st hexagons are classified as no pattern detected, indicating that weekend/holiday demand does not form stable clusters across much of the city. Among the significant classes, persistent coldspots and sporadic coldspots are the next most common, pointing to areas where trip counts are consistently low or intermittently low. Sporadic hotspots also appear in meaningful numbers, reflecting localized, irregular bursts of higher demand. In contrast, persistent hotspots are few, and consecutive hotspots/coldspots plus new hotspots/coldspots are rare, showing that newly emerging or sustained high-demand clusters are uncommon in this period. A small NA group reflects locations without enough information to classify.
 
-Overall, the distribution suggests a spatially uneven pattern where low-demand clusters dominate, but isolated hotspots emerge in specific areas. This aligns with the idea that weekend and holiday travel is less structured by daily commuting flows and more influenced by discretionary trips, creating irregular surges in activity at certain nodes while much of the network remains stable at low demand.
+Overall, the distribution suggests a spatially uneven weekend/holiday pattern dominated by low-demand clusters, punctuated by isolated, short-lived hotspots. This aligns with discretionary travel behavior: trips are less governed by routine commutes and more by ad-hoc activities, producing irregular surges at select nodes while most areas remain stably low.
 
-```{r}
+#### EHSA map and Gi* Trends
+
+```{r fig.width=16, fig.height=6}
+# Create the EHSA map
 tmap_mode("plot")
-tm_shape(mpsz) + tm_polygons(col = "grey90", border.col = "white") +
-tm_shape(ehsa_weekend_sf) +
+ehsa_map <- tm_shape(mpsz) + 
+  tm_polygons(col = "grey90", border.col = "white") +
+  tm_shape(ehsa_weekend_sf) +
   tm_polygons(
     fill = "classification",
-    fill.scale = tm_scale_categorical(values = ehsa_colors), # use custom palette
+    fill.scale = tm_scale_categorical(values = ehsa_colors),
     fill.legend = tm_legend(
       title = "EHSA Classification",
       position = tm_pos_in("right", "bottom"))
   ) +
   tm_borders(col = "grey40", lwd = 0.5) +
-  tm_title("Emerging Hot Spot Analysis (EHSA) – Weekend/Holiday (11am–8pm)")
+  tm_shape(mpsz_planning) +
+  tm_borders(col = "grey30", lwd = 1.5) +
+  tm_layout(
+    main.title = "EHSA Map",
+    main.title.size = 1.2,
+    main.title.fontface = "bold"
+  )
 
+# Get one representative hexagon from each significant EHSA classification
+representative_hexagons <- ehsa_weekend_sf %>%
+  st_drop_geometry() %>%
+  filter(classification != "no pattern detected") %>%
+  group_by(classification) %>%
+  slice(1) %>%
+  ungroup() %>%
+  select(HEX_ID, classification)
+
+# Extract Gi* trends for these hexagons
+hex_trends <- gi_weekend %>%
+  st_drop_geometry() %>%
+  filter(HEX_ID %in% representative_hexagons$HEX_ID) %>%
+  select(HEX_ID, HOUR_OF_DAY, gi_star) %>%
+  left_join(representative_hexagons, by = "HEX_ID")
+
+# Create individual plots for each classification type
+plot_list <- list()
+
+for (class in unique(hex_trends$classification)) {
+  hex_data <- hex_trends %>% filter(classification == class)
+  hex_id <- unique(hex_data$HEX_ID)
+  
+  p <- ggplot(data = hex_data, aes(x = HOUR_OF_DAY, y = gi_star)) +
+    geom_line(color = ehsa_colors[class], linewidth = 1.2) +
+    geom_hline(yintercept = 0, linetype = "dashed", color = "grey50") +
+    labs(
+      title = paste0(class, "\n(", hex_id, ")"),
+      x = "Hour of Day",
+      y = "Gi*"
+    ) +
+    theme_minimal() +
+    theme(
+      plot.title = element_text(face = "bold", size = 10, hjust = 0.5),
+      axis.title = element_text(size = 9),
+      axis.text = element_text(size = 8)
+    )
+  
+  plot_list[[class]] <- p
+}
+
+# Combine trend plots
+combined_trends <- wrap_plots(plot_list, ncol = 2) +
+  plot_annotation(
+    title = "Gi* Trends by EHSA Classification",
+    theme = theme(
+      plot.title = element_text(face = "bold", size = 12, hjust = 0.5)
+    )
+  )
+
+# Convert tmap to grob
+ehsa_map_grob <- tmap_grob(ehsa_map)
+
+# Combine map and trends side by side
+final_plot <- plot_grid(
+  ehsa_map_grob,
+  combined_trends,
+  ncol = 2,
+  rel_widths = c(1, 1),
+  labels = NULL
+)
+
+# Add overall title
+title <- ggdraw() + 
+  draw_label(
+    "Emerging Hot Spot Analysis (EHSA) – Weekend/holiday (11am–8pm)",
+    fontface = 'bold',
+    size = 15,
+    x = 0.5,
+    hjust = 0.5
+  )
+
+# Combine title with plots
+final_combined <- plot_grid(
+  title,
+  final_plot,
+  ncol = 1,
+  rel_heights = c(0.05, 0.95)
+)
+
+final_combined
 ```
 
-The EHSA map for weekends and holidays shows a mixed spatial pattern of hotspots and coldspots across Singapore. Consecutive hotspots (red) are concentrated in the central region and along some transport corridors, indicating areas of consistently high demand. Sporadic hotspots (peach) appear across several dispersed locations, reflecting irregular surges in bus activity that may correspond to event-based or recreational travel.
+The EHSA analysis reveals distinct spatial and temporal clustering patterns of weekend/holiday bus trips (11am-8pm), showing fundamentally different characteristics from weekday commuter patterns. The map (left) displays blue coldspots scattered across western, northern, and peripheral planning areas, indicating persistently low weekend trip generation in predominantly residential zones. Red and orange hotspots appear fragmented and dispersed across central, eastern, and selected northern regions, representing major recreational destinations, shopping districts, and tourist attractions. These hotspots are less concentrated than weekday patterns, reflecting leisure-driven rather than employment-driven travel dynamics.
 
-On the other hand, consecutive and persistent coldspots (dark blue) dominate the western and northern peripheries, suggesting stable zones of consistently low bus demand, particularly in less connected or industrial areas. New coldspots (teal) are also scattered, highlighting emerging low-demand locations during weekends. Grey areas classified as “no pattern detected” cover a large share of the map, signifying that many regions do not show statistically strong or consistent clustering.
+The Gi* trend plots (right) demonstrate diverse temporal behaviors across classifications throughout the 11am-8pm window. Persistent hotspots (dark red, H0003) maintain strongly positive Gi* values (4-5), showing stable high-demand zones at major weekend destinations. Sporadic hotspots (orange, H0017 and H0010) exhibit fluctuating positive values, suggesting intermittent clustering as visitors arrive at leisure destinations at varying times throughout the day.
 
-Overall, the map suggests that weekend and holiday demand is more dispersed compared to weekday peaks, with central and activity-rich areas sustaining stronger hotspots, while peripheral estates remain coldspots. This highlights the recreational and leisure-driven nature of weekend travel, where demand is concentrated in specific urban nodes rather than broadly distributed across the network.
+Persistent coldspots (dark blue, H0006) remain consistently negative (-0.5 to -1.0), confirming stable low-demand areas in residential zones lacking recreational attractions. Sporadic coldspots (light blue, H0468) show variable patterns, while new hotspots (pink, H0513) emerge with positive trends, representing areas developing high-demand patterns specifically during weekend leisure hours. Consecutive hotspots (red, H0110) maintain elevated Gi* values (4-5), indicating sustained demand at popular weekend destinations.
+
+# 7 Conclusion
+
+This study shows that Singapore’s bus demand is highly uneven across space and time, with three consistent signals. First, trip volumes are strongly right-skewed in every period: most hexagons generate modest activity while a small set of locations—typically major residential towns, transfer nodes, and mixed-use hubs—account for a disproportionate share of trips. Second, spatial autocorrelation is present but varies by period. Weekday mornings display the clearest and most contiguous clustering: high–high clusters align with large housing corridors feeding central employment areas, while peripheral/industrial belts form low–low clusters. Third, evening and weekend patterns are more fragmented. In the afternoon peak, high–high clusters shrink and disperse, and low–high outliers rise—evidence of transitional edges and mixed land-use environments as commuters spread across diverse destinations. On weekends/holidays, demand becomes leisure-oriented: persistent cold spots dominate many peripheral zones, while hotspots concentrate around retail, recreation, and tourist areas, often as sporadic rather than persistent classes.
+
+Methodologically, the combined use of Local Moran’s I, Gi * , HCSA and EHSA provides complementary lenses: LISA highlights where similarity clusters and outliers sit; Gi* quantifies the intensity of local concentration; HCSA filters Gi* to statistically robust hot/cold spots; and EHSA adds a temporal dimension, distinguishing persistent, consecutive, new, and sporadic patterns. The Mann–Kendall test then probes whether within-period Gi* trajectories trend monotonically. Together, these tools reveal that persistent hotspots are relatively rare outside the weekday morning window; many high-demand areas behave sporadically or shift through the peak, and only a limited number of hexagons exhibit clear monotonic trends within the examined hours.
+
+Planning implications follow directly. For weekday mornings, strengthening trunk capacity and feeder reliability in established high–high corridors is likely to yield the greatest benefit, while targeted coverage and frequency rationalisation may suit persistent low–low belts. Afternoon operations should emphasise flexibility: interlined routes, dynamic short-turns, or headway-based control can better accommodate the dispersed, heterogeneous pattern and elevated share of outliers. On weekends/holidays, service design should pivot toward destination-driven mobility—timed frequencies to malls, parks, waterfronts, and event hubs—while maintaining baseline coverage in stable cold-spot neighborhoods. Across all periods, monitoring sporadic hotspots identified by EHSA is critical for event-responsive capacity and passenger information.
