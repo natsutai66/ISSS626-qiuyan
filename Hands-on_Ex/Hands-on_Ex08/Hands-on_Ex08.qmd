@@ -13,7 +13,6 @@ execute:
   freeze: true
 ---
 
-
 # 1 Overview
 
 Predictive modelling uses statistical learning or machine learning techniques to predict outcomes. By and large, the event one wants to predict is in the future. However, a set of known outcome and predictors (also known as variables) will be used to calibrate the predictive models.
@@ -255,15 +254,15 @@ write_rds(gwr_bw_test_adaptive,
 
 ## 8.5 Computing predicted values of the test data
 
-```{r}
+
 gwr_pred <- gwr.predict(
-  formula = resale_price ~ floor_area_sqm +
-    storey_order + remaining_lease_mths +
-    PROX_CBD + PROX_ELDERLYCARE + PROX_HAWKER +
+  formula = resale_price ~ floor_area_sqm + 
+    storey_order + remaining_lease_mths + 
+    PROX_CBD + PROX_ELDERLYCARE + PROX_HAWKER + 
     PROX_MRT + PROX_PARK + PROX_MALL + 
     PROX_SUPERMARKET + WITHIN_350M_KINDERGARTEN +
-    WITHIN_350M_CHILDCARE + WITHIN_350M_BUS +
-    WITHIN_1KM_PRISCH,
+    WITHIN_350M_CHILDCARE + WITHIN_350M_BUS + 
+    WITHIN_1KM_PRISCH, 
   data=train_data, 
   predictdata = test_data, 
   bw=40, 
@@ -273,7 +272,7 @@ gwr_pred <- gwr.predict(
 
 write_rds(gwr_pred, 
           "data/model/gwr_pred.rds")
-```
+
 
 # 9 Calibrating Random Forest Model
 
@@ -431,5 +430,4 @@ ggplot(data = test_data_p,
        aes(x = GRF_pred,
            y = resale_price)) +
   geom_point()
-
 ```
