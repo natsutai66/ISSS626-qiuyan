@@ -1244,5 +1244,152 @@
     "title": "Take-home-Exercise 3",
     "section": "Visualization of Model Residuals",
     "text": "Visualization of Model Residuals\nThe code below calculates the residuals of both models, and visualizes them on a map to compare where each model overestimates or underestimates HDB resale prices across Singapore.\n\n\nCode\n## Visualization of Model Residuals\n\n# Calculate residuals for both models\nhdb_resale_test &lt;- hdb_resale_test %&gt;%\n  mutate(\n    MLR_RES = resale_price - PREDICT_MLR,\n    GWRF_RES = resale_price - PREDICT_GWRF\n  )\n\n# Define common breaks for consistent color scaling\ncommon_breaks &lt;- c(-Inf, seq(-400000, 400000, by = 100000), Inf)\n\n# Create base map with borders\nbase_map &lt;- tm_shape(mpsz) +\n  tm_polygons(col = \"white\", border.col = \"gray70\", border.alpha = 0.5)\n\n# Create MLR residuals map\nmlr_res_map &lt;- base_map +\n  tm_shape(hdb_resale_test) +\n  tm_dots(\n    col = \"MLR_RES\",\n    breaks = common_breaks,\n    palette = \"-RdBu\",\n    size = 0.2,\n    alpha = 0.7,\n    border.col = \"black\",\n    border.lwd = 0.5,\n    border.alpha = 0.3,\n    title = \"MLR Residuals ($)\"  # Add title for MLR legend\n  ) +\n  tm_layout(\n    main.title = \"Multiple Linear Regression Residuals\",\n    main.title.size = 1,\n    legend.outside = TRUE,  # Place legend outside\n    legend.outside.position = \"right\"  # Position on right\n  )\n\n# Create GWRF residuals map\ngwrf_res_map &lt;- base_map +\n  tm_shape(hdb_resale_test) +\n  tm_dots(\n    col = \"GWRF_RES\",\n    breaks = common_breaks,\n    palette = \"-RdBu\",\n    size = 0.2,\n    alpha = 0.7,\n    border.col = \"black\",\n    border.lwd = 0.5,\n    border.alpha = 0.3,\n    title = \"GWRF Residuals ($)\"  # Add title for GWRF legend\n  ) +\n  tm_layout(\n    main.title = \"Geographically Weighted Random Forest Residuals\",\n    main.title.size = 1,\n    legend.outside = TRUE,  # Place legend outside\n    legend.outside.position = \"right\"  # Position on right\n  )\n\n# Set to plot mode for static visualization\ntmap_mode(\"plot\")\n\n# Arrange both maps side by side\ntmap_arrange(mlr_res_map, gwrf_res_map, ncol = 2)\n\n\n\n\n\n\n\n\n\nThe spatial distribution of residuals reveals important patterns in model performance across different areas of Singapore, where red indicates over-prediction (model predicts higher than actual price) and blue indicates under-prediction (model predicts lower than actual price), with neutral colors representing accurate predictions near zero error.\nThe MLR residuals map (left) shows a relatively balanced spatial pattern with both red and blue dots distributed across various regions. However, there appears to be some clustering of positive residuals (over-predictions) in certain central and northeastern areas, while negative residuals (under-predictions) are visible in scattered locations. This pattern suggests that the global linear model may struggle to capture local price variations in specific neighborhoods.\nThe GWRF residuals map (right) displays more pronounced clusters of large residuals, particularly evident in the central region where dark red dots indicate substantial over-predictions exceeding $400,000. The GWRF model shows more extreme prediction errors concentrated in specific areas, especially for higher-priced properties in central locations. This clustering pattern suggests that despite the model’s spatial flexibility, it is overfitting to local training data patterns that don’t generalize well to the test period, resulting in larger and more spatially concentrated errors compared to the simpler MLR approach. The concentration of large errors in premium neighborhoods indicates that the GWRF model may be particularly sensitive to temporal market changes in high-value areas, where prices can fluctuate more dramatically between training and test periods."
+  },
+  {
+    "objectID": "In-class_Ex/In-class_Ex_09/In-class_Ex_09.html",
+    "href": "In-class_Ex/In-class_Ex_09/In-class_Ex_09.html",
+    "title": "In-class_Ex09",
+    "section": "",
+    "text": "pacman::p_load(tmap, SpatialAcc, sf, \n               ggstatsplot, reshape2,\n               tidyverse)\n\npackage 'SpatialAcc' successfully unpacked and MD5 sums checked\n\nThe downloaded binary packages are in\n    C:\\Users\\tqy87\\AppData\\Local\\Temp\\Rtmp6hmHON\\downloaded_packages\n\n\n\nmpsz &lt;- st_read(dsn = \"data/geospatial\", layer = \"MP14_SUBZONE_NO_SEA_PL\")\n\nReading layer `MP14_SUBZONE_NO_SEA_PL' from data source \n  `C:\\Users\\tqy87\\OneDrive\\Documents\\natsutai66\\ISSS626-qiuyan\\In-class_Ex\\In-class_Ex_09\\data\\geospatial' \n  using driver `ESRI Shapefile'\nSimple feature collection with 323 features and 15 fields\nGeometry type: MULTIPOLYGON\nDimension:     XY\nBounding box:  xmin: 2667.538 ymin: 15748.72 xmax: 56396.44 ymax: 50256.33\nProjected CRS: SVY21\n\nhexagons &lt;- st_read(dsn = \"data/geospatial\", layer = \"hexagons\") \n\nReading layer `hexagons' from data source \n  `C:\\Users\\tqy87\\OneDrive\\Documents\\natsutai66\\ISSS626-qiuyan\\In-class_Ex\\In-class_Ex_09\\data\\geospatial' \n  using driver `ESRI Shapefile'\nSimple feature collection with 3125 features and 6 fields\nGeometry type: POLYGON\nDimension:     XY\nBounding box:  xmin: 2667.538 ymin: 21506.33 xmax: 50010.26 ymax: 50256.33\nProjected CRS: SVY21 / Singapore TM\n\neldercare &lt;- st_read(dsn = \"data/geospatial\", layer = \"ELDERCARE\") \n\nReading layer `ELDERCARE' from data source \n  `C:\\Users\\tqy87\\OneDrive\\Documents\\natsutai66\\ISSS626-qiuyan\\In-class_Ex\\In-class_Ex_09\\data\\geospatial' \n  using driver `ESRI Shapefile'\nSimple feature collection with 120 features and 19 fields\nGeometry type: POINT\nDimension:     XY\nBounding box:  xmin: 14481.92 ymin: 28218.43 xmax: 41665.14 ymax: 46804.9\nProjected CRS: SVY21 / Singapore TM\n\nmpsz &lt;- st_transform(mpsz, 3414)\neldercare &lt;- st_transform(eldercare, 3414)\nhexagons &lt;- st_transform(hexagons, 3414)\n\n\neldercare &lt;- eldercare %&gt;%\n  select(fid, ADDRESSPOS) %&gt;%\n  mutate(capacity = 100)\n\nhexagons &lt;- hexagons %&gt;%\n  select(fid) %&gt;%\n  mutate(demand = 100)\n\n\nODMatrix &lt;- read_csv(\"data/aspatial/OD_Matrix.csv\")\ndistmat &lt;- ODMatrix %&gt;%\n  select(origin_id, destination_id, total_cost) %&gt;%\n  spread(destination_id, total_cost) %&gt;%\n  select(-origin_id)\ndistmat_km &lt;- as.matrix(distmat / 1000)\n\n\npowers &lt;- c(0.5, 1, 1.5, 2, 2.5)\n\nresults &lt;- list()\nfor (p in powers) {\n  acc &lt;- data.frame(ac(hexagons$demand,\n                       eldercare$capacity,\n                       distmat_km,\n                       power = p,\n                       family = \"Hansen\"))\n  colnames(acc) &lt;- \"accHansen\"\n  acc &lt;- as_tibble(acc)\n  hex_res &lt;- bind_cols(hexagons, acc)\n  hex_res$power &lt;- p\n  results[[as.character(p)]] &lt;- hex_res\n}\n\nhexagon_Hansen_all &lt;- bind_rows(results)\n\n\nmapex &lt;- st_bbox(hexagons)\n\n\ntm_shape(hexagon_Hansen_all, bbox = mapex) +\n  tm_facets(by = \"power\", ncol = 3) +\n  tm_polygons(fill = \"accHansen\",\n              fill.scale = tm_scale_intervals(\n                style = \"quantile\",\n                n = 10,\n                values = \"brewer.blues\")) +\n  tm_shape(eldercare) +\n  tm_dots(size = 0.3, fill = \"red\", col = \"black\") +\n  tm_title(\"Accessibility to eldercare (Hansen, different power values)\") +\n  tm_layout(frame = TRUE) +\n  tm_compass(type = \"8star\", size = 2) +\n  tm_scalebar() +\n  tm_grid(alpha = 0.2)"
+  },
+  {
+    "objectID": "In-class_Ex/In-class_Ex_09/data/geospatial/hexagons.html",
+    "href": "In-class_Ex/In-class_Ex_09/data/geospatial/hexagons.html",
+    "title": "ISSS626-QiuYan",
+    "section": "",
+    "text": "&lt;!DOCTYPE qgis PUBLIC ‘http://mrcc.com/qgis.dtd’ ‘SYSTEM’&gt;     dataset\n\n\n                 0 0     false"
+  },
+  {
+    "objectID": "In-class_Ex/In-class_Ex_09/data/geospatial/ELDERCARE.html",
+    "href": "In-class_Ex/In-class_Ex_09/data/geospatial/ELDERCARE.html",
+    "title": "ISSS626-QiuYan",
+    "section": "",
+    "text": "&lt;!DOCTYPE qgis PUBLIC ‘http://mrcc.com/qgis.dtd’ ‘SYSTEM’&gt;  ELDERCARE  ENG dataset\n\nELDERCARE\n\n                 0 0     false"
+  },
+  {
+    "objectID": "Hands-on_Ex/Hands-on_Ex09/Hands-on_Ex09.html",
+    "href": "Hands-on_Ex/Hands-on_Ex09/Hands-on_Ex09.html",
+    "title": "Hands-on_Ex09",
+    "section": "",
+    "text": "In this hands-on exercise, you will gain hands-on experience on how to model geographical accessibility by using R’s geospatial analysis packages.\n\n\nBy the end of this hands-on exercise, you will be able:\n\nto import GIS polygon data into R and save them as simple feature data frame by using appropriate functions of sf package of R;\nto import aspatial data into R and save them as simple feature data frame by using appropriate functions of sf package of R;\nto computer accessibility measure by using Hansen’s potential model and Spatial Accessibility Measure (SAM); and\nto visualise the accessibility measures by using tmap and ggplot2 packages."
+  },
+  {
+    "objectID": "Hands-on_Ex/Hands-on_Ex09/Hands-on_Ex09.html#learning-outcome",
+    "href": "Hands-on_Ex/Hands-on_Ex09/Hands-on_Ex09.html#learning-outcome",
+    "title": "Hands-on_Ex09",
+    "section": "",
+    "text": "By the end of this hands-on exercise, you will be able:\n\nto import GIS polygon data into R and save them as simple feature data frame by using appropriate functions of sf package of R;\nto import aspatial data into R and save them as simple feature data frame by using appropriate functions of sf package of R;\nto computer accessibility measure by using Hansen’s potential model and Spatial Accessibility Measure (SAM); and\nto visualise the accessibility measures by using tmap and ggplot2 packages."
+  },
+  {
+    "objectID": "Hands-on_Ex/Hands-on_Ex09/Hands-on_Ex09.html#importing-geospatial-data",
+    "href": "Hands-on_Ex/Hands-on_Ex09/Hands-on_Ex09.html#importing-geospatial-data",
+    "title": "Hands-on_Ex09",
+    "section": "4.1 Importing geospatial data",
+    "text": "4.1 Importing geospatial data\nThree geospatial data will be imported from the data/geospatial sub-folder. They are MP14_SUBZONE_NO_SEA_PL, hexagons and ELDERCARE.\nThe code chunk below is used to import these three data sets shapefile by using st_read() of sf packages.\n\nmpsz &lt;- st_read(dsn = \"data/geospatial\", layer = \"MP14_SUBZONE_NO_SEA_PL\")\n\nReading layer `MP14_SUBZONE_NO_SEA_PL' from data source \n  `C:\\Users\\tqy87\\OneDrive\\Documents\\natsutai66\\ISSS626-qiuyan\\Hands-on_Ex\\Hands-on_Ex09\\data\\geospatial' \n  using driver `ESRI Shapefile'\nSimple feature collection with 323 features and 15 fields\nGeometry type: MULTIPOLYGON\nDimension:     XY\nBounding box:  xmin: 2667.538 ymin: 15748.72 xmax: 56396.44 ymax: 50256.33\nProjected CRS: SVY21\n\nhexagons &lt;- st_read(dsn = \"data/geospatial\", layer = \"hexagons\") \n\nReading layer `hexagons' from data source \n  `C:\\Users\\tqy87\\OneDrive\\Documents\\natsutai66\\ISSS626-qiuyan\\Hands-on_Ex\\Hands-on_Ex09\\data\\geospatial' \n  using driver `ESRI Shapefile'\nSimple feature collection with 3125 features and 6 fields\nGeometry type: POLYGON\nDimension:     XY\nBounding box:  xmin: 2667.538 ymin: 21506.33 xmax: 50010.26 ymax: 50256.33\nProjected CRS: SVY21 / Singapore TM\n\neldercare &lt;- st_read(dsn = \"data/geospatial\", layer = \"ELDERCARE\") \n\nReading layer `ELDERCARE' from data source \n  `C:\\Users\\tqy87\\OneDrive\\Documents\\natsutai66\\ISSS626-qiuyan\\Hands-on_Ex\\Hands-on_Ex09\\data\\geospatial' \n  using driver `ESRI Shapefile'\nSimple feature collection with 120 features and 19 fields\nGeometry type: POINT\nDimension:     XY\nBounding box:  xmin: 14481.92 ymin: 28218.43 xmax: 41665.14 ymax: 46804.9\nProjected CRS: SVY21 / Singapore TM"
+  },
+  {
+    "objectID": "Hands-on_Ex/Hands-on_Ex09/Hands-on_Ex09.html#updating-crs-information",
+    "href": "Hands-on_Ex/Hands-on_Ex09/Hands-on_Ex09.html#updating-crs-information",
+    "title": "Hands-on_Ex09",
+    "section": "4.2 Updating CRS information",
+    "text": "4.2 Updating CRS information\nThe code chunk below updates the newly imported mpsz with the correct ESPG code (i.e. 3414)\n\nmpsz &lt;- st_transform(mpsz, 3414)\neldercare &lt;- st_transform(eldercare, 3414)\nhexagons &lt;- st_transform(hexagons, 3414)\n\nAfter transforming the projection metadata, you can verify the projection of the newly transformed mpsz_svy21 by using st_crs() of sf package.\nThe code chunk below will be used to verify the newly transformed mpsz_svy21.\n\nst_crs(mpsz)\n\nCoordinate Reference System:\n  User input: EPSG:3414 \n  wkt:\nPROJCRS[\"SVY21 / Singapore TM\",\n    BASEGEOGCRS[\"SVY21\",\n        DATUM[\"SVY21\",\n            ELLIPSOID[\"WGS 84\",6378137,298.257223563,\n                LENGTHUNIT[\"metre\",1]]],\n        PRIMEM[\"Greenwich\",0,\n            ANGLEUNIT[\"degree\",0.0174532925199433]],\n        ID[\"EPSG\",4757]],\n    CONVERSION[\"Singapore Transverse Mercator\",\n        METHOD[\"Transverse Mercator\",\n            ID[\"EPSG\",9807]],\n        PARAMETER[\"Latitude of natural origin\",1.36666666666667,\n            ANGLEUNIT[\"degree\",0.0174532925199433],\n            ID[\"EPSG\",8801]],\n        PARAMETER[\"Longitude of natural origin\",103.833333333333,\n            ANGLEUNIT[\"degree\",0.0174532925199433],\n            ID[\"EPSG\",8802]],\n        PARAMETER[\"Scale factor at natural origin\",1,\n            SCALEUNIT[\"unity\",1],\n            ID[\"EPSG\",8805]],\n        PARAMETER[\"False easting\",28001.642,\n            LENGTHUNIT[\"metre\",1],\n            ID[\"EPSG\",8806]],\n        PARAMETER[\"False northing\",38744.572,\n            LENGTHUNIT[\"metre\",1],\n            ID[\"EPSG\",8807]]],\n    CS[Cartesian,2],\n        AXIS[\"northing (N)\",north,\n            ORDER[1],\n            LENGTHUNIT[\"metre\",1]],\n        AXIS[\"easting (E)\",east,\n            ORDER[2],\n            LENGTHUNIT[\"metre\",1]],\n    USAGE[\n        SCOPE[\"Cadastre, engineering survey, topographic mapping.\"],\n        AREA[\"Singapore - onshore and offshore.\"],\n        BBOX[1.13,103.59,1.47,104.07]],\n    ID[\"EPSG\",3414]]"
+  },
+  {
+    "objectID": "Hands-on_Ex/Hands-on_Ex09/Hands-on_Ex09.html#cleaning-and-updating-attribute-fields-of-the-geospatial-data",
+    "href": "Hands-on_Ex/Hands-on_Ex09/Hands-on_Ex09.html#cleaning-and-updating-attribute-fields-of-the-geospatial-data",
+    "title": "Hands-on_Ex09",
+    "section": "4.3 Cleaning and updating attribute fields of the geospatial data",
+    "text": "4.3 Cleaning and updating attribute fields of the geospatial data\nThere are many redundant fields in the data tables of both eldercare and hexagons. The code chunks below will be used to exclude those redundant fields. At the same time, a new field called demand and a new field called capacity will be added into the data table of hexagons and eldercare sf data frame respectively. Both fields are derive using mutate() of dplyr package.\n\neldercare &lt;- eldercare %&gt;%\n  select(fid, ADDRESSPOS) %&gt;%\n  mutate(capacity = 100)\n\n\nhexagons &lt;- hexagons %&gt;%\n  select(fid) %&gt;%\n  mutate(demand = 100)\n\nNotice that for the purpose of this hands-on exercise, a constant value of 100 is used. In practice, actual demand of the hexagon and capacity of the eldercare centre should be used."
+  },
+  {
+    "objectID": "Hands-on_Ex/Hands-on_Ex09/Hands-on_Ex09.html#importing-distance-matrix",
+    "href": "Hands-on_Ex/Hands-on_Ex09/Hands-on_Ex09.html#importing-distance-matrix",
+    "title": "Hands-on_Ex09",
+    "section": "5.1 Importing Distance Matrix",
+    "text": "5.1 Importing Distance Matrix\nThe code chunk below uses read_cvs() of readr package to import OD_Matrix.csv into RStudio. The imported object is a tibble data.frame called ODMatrix.\n\nODMatrix &lt;- read_csv(\"data/aspatial/OD_Matrix.csv\", skip = 0)"
+  },
+  {
+    "objectID": "Hands-on_Ex/Hands-on_Ex09/Hands-on_Ex09.html#tidying-distance-matrix",
+    "href": "Hands-on_Ex/Hands-on_Ex09/Hands-on_Ex09.html#tidying-distance-matrix",
+    "title": "Hands-on_Ex09",
+    "section": "5.2 Tidying distance matrix",
+    "text": "5.2 Tidying distance matrix\nThe code chunk below uses spread() of tidyr package is used to transform the O-D matrix from a thin format into a fat format.\n\ndistmat &lt;- ODMatrix %&gt;%\n  select(origin_id, destination_id, total_cost) %&gt;%\n  spread(destination_id, total_cost)%&gt;%\n  select(c(-c('origin_id')))\n\nNote: Since tidyr version 1.0 a new function called pivot_wider() is introduce. You should use pivot_wider() instead of spread()\nCurrently, the distance is measured in metre because SVY21 projected coordinate system is used. The code chunk below will be used to convert the unit f measurement from metre to kilometre.\n\ndistmat_km &lt;- as.matrix(distmat/1000)"
+  },
+  {
+    "objectID": "Hands-on_Ex/Hands-on_Ex09/Hands-on_Ex09.html#computing-hansens-accessibility",
+    "href": "Hands-on_Ex/Hands-on_Ex09/Hands-on_Ex09.html#computing-hansens-accessibility",
+    "title": "Hands-on_Ex09",
+    "section": "6.1 Computing Hansen’s accessibility",
+    "text": "6.1 Computing Hansen’s accessibility\nNow, we ready to compute Hansen’s accessibility by using ac() of SpatialAcc package. Before getting started, you are encourage to read the arguments of the function at least once in order to ensure that the required inputs are available.\nThe code chunk below calculates Hansen’s accessibility using ac() of SpatialAcc and data.frame() is used to save the output in a data frame called acc_Handsen.\n\nacc_Hansen &lt;- data.frame(ac(hexagons$demand,\n                            eldercare$capacity,\n                            distmat_km, \n                            #d0 = 50,\n                            power = 2, \n                            family = \"Hansen\"))\n\nThe default field name is very messy, we will rename it to accHansen by using the code chunk below.\n\ncolnames(acc_Hansen) &lt;- \"accHansen\"\n\nNext, we will convert the data table into tibble format by using the code chunk below.\n\nacc_Hansen &lt;- as_tibble(acc_Hansen)\n\nLastly, bind_cols() of dplyr will be used to join the acc_Hansen tibble data frame with the hexagons simple feature data frame. The output is called hexagon_Hansen.\n\nhexagon_Hansen &lt;- bind_cols(hexagons, acc_Hansen)\n\n\nacc_Hansen &lt;- data.frame(ac(hexagons$demand,\n                            eldercare$capacity,\n                            distmat_km, \n                            #d0 = 50,\n                            power = 0.5, \n                            family = \"Hansen\"))\n\ncolnames(acc_Hansen) &lt;- \"accHansen\"\nacc_Hansen &lt;- as_tibble(acc_Hansen)\nhexagon_Hansen &lt;- bind_cols(hexagons, acc_Hansen)"
+  },
+  {
+    "objectID": "Hands-on_Ex/Hands-on_Ex09/Hands-on_Ex09.html#visualising-hansens-accessibility",
+    "href": "Hands-on_Ex/Hands-on_Ex09/Hands-on_Ex09.html#visualising-hansens-accessibility",
+    "title": "Hands-on_Ex09",
+    "section": "6.2 Visualising Hansen’s accessibility",
+    "text": "6.2 Visualising Hansen’s accessibility\n\n6.2.1 Extracting map extend\nFirstly, we will extract the extend of hexagons simple feature data frame by by using st_bbox() of sf package.\n\nmapex &lt;- st_bbox(hexagons)\n\nThe code chunk below uses a collection of mapping fucntions of tmap package to create a high cartographic quality accessibility to eldercare centre in Singapore.\n\ntm_shape(hexagon_Hansen,\n         bbox = mapex) + \n  tm_polygons(fill = \"accHansen\", \n              fill.scale = tm_scale_intervals(\n                style = \"quantile\",\n                n = 10,\n                values = \"brewer.blues\")) +\ntm_shape(eldercare) +\n  tm_dots(size = 0.3,\n          fill = \"red\",\n          col = \"black\") +\n  tm_title(\"Accessibility to eldercare: Hansen method\") +\n  tm_layout(frame = TRUE) +\n  tm_compass(type=\"8star\", size = 2) +\n  tm_scalebar() +\n  tm_grid(alpha = 0.2)"
+  },
+  {
+    "objectID": "Hands-on_Ex/Hands-on_Ex09/Hands-on_Ex09.html#statistical-graphic-visualisation",
+    "href": "Hands-on_Ex/Hands-on_Ex09/Hands-on_Ex09.html#statistical-graphic-visualisation",
+    "title": "Hands-on_Ex09",
+    "section": "6.3 Statistical graphic visualisation",
+    "text": "6.3 Statistical graphic visualisation\nIn this section, we are going to compare the distribution of Hansen’s accessibility values by URA Planning Region.\nFirstly, we need to add the planning region field into haxegon_Hansen simple feature data frame by using the code chunk below.\n\nhexagon_Hansen &lt;- st_join(hexagon_Hansen, mpsz, \n                          join = st_intersects)\n\nNext, ggplot() will be used to plot the distribution by using boxplot graphical method.\n\nggplot(data=hexagon_Hansen, \n       aes(y = log(accHansen), \n           x= REGION_N)) +\n  geom_boxplot() +\n  geom_point(stat=\"summary\", \n             fun.y=\"mean\", \n             colour =\"red\", \n             size=2)"
+  },
+  {
+    "objectID": "Hands-on_Ex/Hands-on_Ex09/Hands-on_Ex09.html#computing-kd2sfcas-accessibility",
+    "href": "Hands-on_Ex/Hands-on_Ex09/Hands-on_Ex09.html#computing-kd2sfcas-accessibility",
+    "title": "Hands-on_Ex09",
+    "section": "7.1 Computing KD2SFCA’s accessibility",
+    "text": "7.1 Computing KD2SFCA’s accessibility\nIn this section, you are going to repeat most of the steps you had learned in previous section to perform the analysis. However, some of the codes will be combined into one code chunk. The code chunk below calculates Hansen’s accessibility using ac() of SpatialAcc and data.frame() is used to save the output in a data frame called acc_KD2SFCA. Notice that KD2SFCA is used for family argument.\n\nacc_KD2SFCA &lt;- data.frame(ac(hexagons$demand,\n                            eldercare$capacity,\n                            distmat_km, \n                            d0 = 5,\n                            power = 2, \n                            family = \"KD2SFCA\"))\n\ncolnames(acc_KD2SFCA) &lt;- \"accKD2SFCA\"\nacc_KD2SFCA &lt;- as_tibble(acc_KD2SFCA)\nhexagon_KD2SFCA &lt;- bind_cols(hexagons, acc_KD2SFCA)"
+  },
+  {
+    "objectID": "Hands-on_Ex/Hands-on_Ex09/Hands-on_Ex09.html#visualising-kd2sfcas-accessibility",
+    "href": "Hands-on_Ex/Hands-on_Ex09/Hands-on_Ex09.html#visualising-kd2sfcas-accessibility",
+    "title": "Hands-on_Ex09",
+    "section": "7.2 Visualising KD2SFCA’s accessibility",
+    "text": "7.2 Visualising KD2SFCA’s accessibility\nThe code chunk below uses a collection of mapping fucntions of tmap package to create a high cartographic quality accessibility to eldercare centre in Singapore. Notice that mapex is reused for bbox argument.\n\ntm_shape(hexagon_KD2SFCA,\n         bbox = mapex) + \n  tm_polygons(fill = \"accKD2SFCA\", \n              fill.scale = tm_scale_intervals(\n                style = \"quantile\",\n                n = 10,\n                values = \"brewer.blues\")) +\ntm_shape(eldercare) +\n  tm_dots(size = 0.3,\n          fill = \"red\",\n          col = \"black\") +\n  tm_title(\"Accessibility to eldercare: KD2SFCA method\") +\n  tm_layout(frame = TRUE) +\n  tm_compass(type=\"8star\", size = 2) +\n  tm_scalebar() +\n  tm_grid(alpha = 0.2)"
+  },
+  {
+    "objectID": "Hands-on_Ex/Hands-on_Ex09/Hands-on_Ex09.html#statistical-graphic-visualisation-1",
+    "href": "Hands-on_Ex/Hands-on_Ex09/Hands-on_Ex09.html#statistical-graphic-visualisation-1",
+    "title": "Hands-on_Ex09",
+    "section": "7.3 Statistical graphic visualisation",
+    "text": "7.3 Statistical graphic visualisation\nNow, we are going to compare the distribution of KD2CFA accessibility values by URA Planning Region.\nFirstly, we need to add the planning region field into hexagon_KD2SFCA simple feature data frame by using the code chunk below.\n\nhexagon_KD2SFCA &lt;- st_join(hexagon_KD2SFCA, mpsz, \n                          join = st_intersects)\n\nNext, ggplot() will be used to plot the distribution by using boxplot graphical method.\n\nggplot(data=hexagon_KD2SFCA, \n       aes(y = accKD2SFCA, \n           x= REGION_N)) +\n  geom_boxplot() +\n  geom_point(stat=\"summary\", \n             fun.y=\"mean\", \n             colour =\"red\", \n             size=2)"
+  },
+  {
+    "objectID": "Hands-on_Ex/Hands-on_Ex09/Hands-on_Ex09.html#computing-sam-accessibility",
+    "href": "Hands-on_Ex/Hands-on_Ex09/Hands-on_Ex09.html#computing-sam-accessibility",
+    "title": "Hands-on_Ex09",
+    "section": "8.1 Computing SAM accessibility",
+    "text": "8.1 Computing SAM accessibility\nIn this section, you are going to repeat most of the steps you had learned in previous section to perform the analysis. However, some of the codes will be combined into one code chunk. The code chunk below calculates Hansen’s accessibility using ac() of SpatialAcc and data.frame() is used to save the output in a data frame called acc_SAM. Notice that SAM is used for family argument.\n\nacc_SAM &lt;- data.frame(ac(hexagons$demand,\n                         eldercare$capacity,\n                         distmat_km, \n                         d0 = 5,\n                         power = 2, \n                         family = \"SAM\"))\n\ncolnames(acc_SAM) &lt;- \"accSAM\"\nacc_SAM &lt;- as_tibble(acc_SAM)\nhexagon_SAM &lt;- bind_cols(hexagons, acc_SAM)"
+  },
+  {
+    "objectID": "Hands-on_Ex/Hands-on_Ex09/Hands-on_Ex09.html#visualising-sams-accessibility",
+    "href": "Hands-on_Ex/Hands-on_Ex09/Hands-on_Ex09.html#visualising-sams-accessibility",
+    "title": "Hands-on_Ex09",
+    "section": "8.2 Visualising SAM’s accessibility",
+    "text": "8.2 Visualising SAM’s accessibility\nThe code chunk below uses a collection of mapping fucntions of tmap package to create a high cartographic quality accessibility to eldercare centre in Singapore. Notice that mapex is reused for bbox argument.\n\ntm_shape(hexagon_SAM,\n         bbox = mapex) + \n  tm_polygons(fill = \"accSAM\", \n              fill.scale = tm_scale_intervals(\n                style = \"quantile\",\n                n = 10,\n                values = \"brewer.blues\")) +\ntm_shape(eldercare) +\n  tm_dots(size = 0.3,\n          fill = \"red\",\n          col = \"black\") +\n  tm_title(\"Accessibility to eldercare: SAM method\") +\n  tm_layout(frame = TRUE) +\n  tm_compass(type=\"8star\", size = 2) +\n  tm_scalebar() +\n  tm_grid(alpha = 0.2)"
+  },
+  {
+    "objectID": "Hands-on_Ex/Hands-on_Ex09/Hands-on_Ex09.html#statistical-graphic-visualisation-2",
+    "href": "Hands-on_Ex/Hands-on_Ex09/Hands-on_Ex09.html#statistical-graphic-visualisation-2",
+    "title": "Hands-on_Ex09",
+    "section": "8.3 Statistical graphic visualisation",
+    "text": "8.3 Statistical graphic visualisation\nNow, we are going to compare the distribution of SAM accessibility values by URA Planning Region.\nFirstly, we need to add the planning region field into hexagon_SAM simple feature data frame by using the code chunk below.\n\nhexagon_SAM &lt;- st_join(hexagon_SAM, mpsz, \n                       join = st_intersects)\n\nNext, ggplot() will be used to plot the distribution by using boxplot graphical method.\n\nggplot(data=hexagon_SAM, \n       aes(y = accSAM, \n           x= REGION_N)) +\n  geom_boxplot() +\n  geom_point(stat=\"summary\", \n             fun.y=\"mean\", \n             colour =\"red\", \n             size=2)"
+  },
+  {
+    "objectID": "Hands-on_Ex/Hands-on_Ex09/data/geospatial/hexagons.html",
+    "href": "Hands-on_Ex/Hands-on_Ex09/data/geospatial/hexagons.html",
+    "title": "ISSS626-QiuYan",
+    "section": "",
+    "text": "&lt;!DOCTYPE qgis PUBLIC ‘http://mrcc.com/qgis.dtd’ ‘SYSTEM’&gt;     dataset\n\n\n                 0 0     false"
+  },
+  {
+    "objectID": "Hands-on_Ex/Hands-on_Ex09/data/geospatial/ELDERCARE.html",
+    "href": "Hands-on_Ex/Hands-on_Ex09/data/geospatial/ELDERCARE.html",
+    "title": "ISSS626-QiuYan",
+    "section": "",
+    "text": "&lt;!DOCTYPE qgis PUBLIC ‘http://mrcc.com/qgis.dtd’ ‘SYSTEM’&gt;  ELDERCARE  ENG dataset\n\nELDERCARE\n\n                 0 0     false"
   }
 ]
