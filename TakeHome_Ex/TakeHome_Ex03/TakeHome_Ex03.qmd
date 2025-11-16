@@ -16,7 +16,7 @@ execute:
 
 # 1 Introduction
 
-This exercise builds a spatial, data-driven framework to explain and predict Singapore HDB resale prices for 5-room flats using both structural attributes (floor area, floor level, remaining lease) and locational accessibility (distance to CBD, MRT, hawker centres, parks, schools, malls, supermarkets, clinics, eldercare; plus counts of nearby facilities). I assemble and geocode multiple open datasets, convert them to a common projection (SVY21 / EPSG:3414), validate and repair geometries, and remove out-of-bounds features to ensure spatial consistency. I then engineer proximity and density features (nearest-distance and within-buffer counts), conduct EDA to understand distributions and spatial patterns, and diagnose multicollinearity. Two modeling approaches are calibrated and compared on a rolling time split (train: Jul 2024–Jun 2025; test: Jul–Sep 2025): a Multiple Linear Regression (MLR) hedonic model and a Geographically Weighted Random Forest (GWRF) that allows local, spatially varying relationships. Model performance is assessed with RMSE, visual prediction checks, residual diagnostics (linearity, normality, heteroscedasticity), and tests for spatial autocorrelation in residuals.
+This exercise develops a spatial, data-driven framework to explain and predict resale prices of 5-room HDB flats in Singapore by integrating structural attributes (floor area, floor level, remaining lease) with detailed measures of locational accessibility. Multiple open datasets are assembled and geocoded via OneMap, harmonised into a common SVY21/EPSG:3414 projection, and cleaned through geometry validation and removal of out-of-bounds features. Proximity features (nearest distance to CBD, MRT, hawker centres, parks, shopping malls, supermarkets, clinics, eldercare and good primary schools) and density features (counts of kindergartens, childcare centres, bus stops, preschools and schools within walkable buffers) are engineered to capture neighbourhood accessibility. Exploratory data analysis is used to examine distributions and spatial patterns, while correlation analysis and VIF diagnostics are applied to mitigate multicollinearity. Three modelling strategies are then calibrated on a rolling time split (train: Jul 2024–Jun 2025; test: Jul–Sep 2025): a global Multiple Linear Regression (MLR) hedonic model, a Geographically Weighted Random Forest (GWRF), and a Geographically Weighted Regression (GWR) with spatially varying coefficients. Model performance is evaluated using RMSE, prediction–observation plots, residual mapping, Moran’s I tests for spatial autocorrelation, in order to assess both predictive accuracy and the extent of spatial non-stationarity in price determinants.
 
 # 2 Loading the R package
 
@@ -64,7 +64,6 @@ pacman::p_load(sf, sp, spdep, olsrr, ggplot2, plotly, SpatialML,
                ggpubr, stringr,patchwork,ggstatsplot,GWmodel)
 ```
 
-
 # 3 Data Importing and Wrangling
 
 Before we start to explore, we need to import Master Plan 2019 Subzone Boundary data of Singapore.
@@ -73,7 +72,7 @@ Before we start to explore, we need to import Master Plan 2019 Subzone Boundary 
 mpsz = read_rds("data/rds/mpsz_cl.rds")
 ```
 
-## 3.1 Structural factors data 
+## 3.1 Structural factors data
 
 The code below imports HDB resale data.
 
@@ -167,8 +166,9 @@ The code below checks the storey_range column in HDBresale data.
 ```{r}
 unique(HDBresale$storey_range)
 ```
- To make the column more usable, a new numeric attribute is created to captures the midpoint of each range.
- 
+
+To make the column more usable, a new numeric attribute is created to captures the midpoint of each range.
+
 ```{r}
 HDBresale <- HDBresale %>%
   mutate(
@@ -219,7 +219,6 @@ HDBresale <- HDBresale %>%
     geometry
   )
 ```
-
 
 ## 3.2 Location factors data
 
@@ -499,6 +498,7 @@ length(which(st_is_valid(bus_stop) == FALSE))
 length(which(st_is_valid(clinics) == FALSE))
 length(which(st_is_valid(preschool) == FALSE))
 ```
+
 As mpsz has invalid geometries, the code below fixes it using st_make_valid() function.
 
 ```{r}
@@ -663,7 +663,6 @@ HDBresale <- HDBresale %>%
     n_schools_1km = map_int(within_1km_schools, length))
 ```
 
-
 # 4 Exploratory Data Analysis
 
 ## Distribution of Resale price
@@ -673,7 +672,7 @@ ggplot(HDBresale, aes(x=resale_price)) +
   geom_histogram(bins = 20, color = "black", fill = "lightblue")
 ```
 
-From the histogram above, we can see that the distribution of HDB resale prices is right-skewed, with most transactions concentrated in the lower to mid-price range. The majority of resale flats are sold between approximately $600,000 and $800,000, indicating this is the typical market value for most units. As prices increase, the number of transactions declines steadily, reflecting fewer high-priced sales. Nonetheless, there are notable outliers, with some flats being transacted above $1 million and even reaching beyond $1.5 million. These high-value units likely represent larger flats, prime locations, or recently renovated units. Overall, the HDB resale market shows a dominant clustering around mid-range prices, with a gradual tapering towards premium-priced properties.
+From the histogram above, we can see that the distribution of HDB resale prices is right-skewed, with most transactions concentrated in the lower to mid-price range. The majority of resale flats are sold between approximately \$600,000 and \$800,000, indicating this is the typical market value for most units. As prices increase, the number of transactions declines steadily, reflecting fewer high-priced sales. Nonetheless, there are notable outliers, with some flats being transacted above \$1 million and even reaching beyond \$1.5 million. These high-value units likely represent larger flats, prime locations, or recently renovated units. Overall, the HDB resale market shows a dominant clustering around mid-range prices, with a gradual tapering towards premium-priced properties.
 
 ```{r}
 tmap_mode("plot")
@@ -742,8 +741,7 @@ ggarrange(UNIT_AREA, UNIT_FLOOR_LEVEL, UNIT_REMAINING_LEASE, UNIT_AGE,
           ncol = 2, nrow = 2)
 ```
 
-The histograms provide an overview of the physical characteristics of HDB resale flats. Most units have a floor area between 110 and 130 square meters, with a sharp concentration indicating the common sizes of 5-room flats or executive apartments. Floor levels are right-skewed, with the majority of flats located between the 1st and 12th floors, and relatively few units situated above the 20th floor. The remaining lease distribution is fairly symmetrical, mostly ranging from 60 to 90 years, showing that many of the flats were built between the late 1990s and early 2000s. Correspondingly, unit age displays a roughly mirrored pattern of remaining lease, with most flats being between 20 and 40 years old. 
-
+The histograms provide an overview of the physical characteristics of HDB resale flats. Most units have a floor area between 110 and 130 square meters, with a sharp concentration indicating the common sizes of 5-room flats or executive apartments. Floor levels are right-skewed, with the majority of flats located between the 1st and 12th floors, and relatively few units situated above the 20th floor. The remaining lease distribution is fairly symmetrical, mostly ranging from 60 to 90 years, showing that many of the flats were built between the late 1990s and early 2000s. Correspondingly, unit age displays a roughly mirrored pattern of remaining lease, with most flats being between 20 and 40 years old.
 
 # 5 Multicollinearity Analysis
 
@@ -751,30 +749,31 @@ The code below analyzes the dataset for multicollinearity, where predictor varia
 
 ```{r fig.height=10, fig.width=12}
 hdb_resale_nogeo <- HDBresale %>%
-  st_drop_geometry()
+  st_drop_geometry()%>%
+  select(
+    -resale_price
+  )
 ggcorrmat(hdb_resale_nogeo, names = hdb_resale_nogeo)
 ```
 
 There is a perfect negative correlation of -1.0 between unit_age and remaining_lease, which represents a critical multicollinearity issue. This perfect correlation is expected since these variables measure essentially the same characteristic from opposite perspectives. Thus, unit_age will be removed.
 
-The analysis also identifies a strong positive correlation of 0.88 between n_schools_1km and n_primary_1km, indicating that areas with many schools within 1km also tend to have many primary schools in the same radius. This high correlation suggests that these variables capture overlapping information about the educational facility density in the neighborhood. Thus, n_primary_1km will be dropped. Similarly, n_preschool_350m and n_childcare_350m show a moderate positive correlation of 0.67, suggesting that preschools and childcare centers tend to cluster together. Thus, n_childcare_350m will be dropped.
-
-Examining the relationship between resale_price and the structural factors, floor_area_sqm shows a moderate positive correlation of 0.45 with resale price, which aligns with expectations that larger units command higher prices. Among the locational factors, dist_cbd and dist_goodps exhibit a correlation of 0.61, indicating that good primary schools tend to be located closer to the Central Business District. Most other distance variables show relatively low to moderate correlations with each other (generally below 0.5), which is favorable as it indicates they capture distinct aspects of location and accessibility. In addition, the cross throughout the matrix denote correlations that are not statistically significant at the p < 0.05 level.
+The analysis also identifies a strong positive correlation of 0.88 between n_schools_1km and n_primary_1km, indicating that areas with many schools within 1km also tend to have many primary schools in the same radius. This high correlation suggests that these variables capture overlapping information about the educational facility density in the neighborhood. Thus, n_schools_1km will be dropped as primary school distance is more important for parents to choose houses. Similarly, n_preschool_350m and n_childcare_350m show strong positive correlation of 0.97, suggesting that they tend to cluster together. Thus, n_childcare_350m will be dropped.
 
 ```{r fig.height=10, fig.width=12}
 re_hdb_nogeo <- HDBresale %>%
   st_drop_geometry() %>%
   select(
-    -n_primary_1km,
+    -n_schools_1km,
     -unit_age,
-    -n_childcare_350m
+    -n_childcare_350m,
+    -resale_price
   )
 
 ggcorrmat(re_hdb_nogeo, names = re_hdb_nogeo)
 ```
 
-The refined dataset now exhibits substantially improved characteristics for regression modeling, with multicollinearity concerns largely resolved. The correlation values are predominantly in the low to moderate range, with the vast majority falling below 0.6, which will facilitate stable coefficient estimation and reduce variance inflation in subsequent hedonic pricing models. 
-
+The refined dataset now exhibits substantially improved characteristics for regression modeling, with multicollinearity concerns largely resolved. The correlation values are predominantly in the low to moderate range, with the vast majority falling below 0.6, which will facilitate stable coefficient estimation and reduce variance inflation in subsequent hedonic pricing models.
 
 # 6 Multiple Linear Regression
 
@@ -811,7 +810,7 @@ resale_mlr <- lm(
     n_kindergartens_350m +
     n_bus_350m +
     n_preschool_350m +
-    n_schools_1km +
+    n_primary_1km +
     floor_area_sqm +
     floor_level +
     remaining_lease,
@@ -821,38 +820,11 @@ resale_mlr <- lm(
 ols_regress(resale_mlr)
 ```
 
-dist_clinics exhibits a high p-value (p = 0.864), suggesting it does not significantly impact resale prices in this model. We will remove this predictor and recalibrate the model to see if it improves the model's performance and interpretability. DIST_SUPERMARKETS (p = 0.046) remains statistically significant and will be retained. 
+The final multiple linear regression (MLR) model successfully explains variation in HDB resale prices, with all 16 variables now statistically significant (p \< 0.05). The model achieves an R-squared of 0.730 and an adjusted R-squared of 0.729, indicating strong explanatory power while maintaining model parsimony. The ANOVA F-statistic of 1056.217 with a p-value \< 0.0001 confirms the model’s overall significance.
 
-```{r}
-resale_mlr <- lm(
-  formula = resale_price ~ 
-    dist_cbd +
-    dist_eldercare +
-    dist_hawker +
-    dist_mrt +
-    dist_parks +
-    dist_goodps +
-    dist_shopping +
-    dist_supermarkets +
-    n_kindergartens_350m +
-    n_bus_350m +
-    n_preschool_350m +
-    n_schools_1km +
-    floor_area_sqm +
-    floor_level +
-    remaining_lease,
-  data = hdb_resale_train
-)
+Among structural factors, floor area emerges as the most influential predictor, with each additional square meter contributing \$7,828 to resale value. Remaining lease adds \$7,240 per year, and floor level contributes \$6,589 per floor, confirming buyers’ preference for larger, newer, and higher-floor units. Locational attributes also play a critical role. Proximity to hawker centres shows the strongest impact, with each additional meter reducing value by \$45.57. Distance to MRT stations (-\$41.56) and the CBD (-\$25.94) further highlight the importance of accessibility to daily necessities, transit, and employment. Additional negative effects are observed for distance to parks, shopping centres, and top primary schools. In terms of facility density, the number of kindergartens within 350 meters contributes the highest positive effect (\$18,147), indicating strong appeal to young families. However, other count-based variables such as nearby preschools and primary schools show negative effects, suggesting potential oversupply or congestion.
 
-ols_regress(resale_mlr)
-```
-
-All remaining variables are now statistically significant. The final multiple linear regression model maintains the performance in predicting HDB resale prices. The model achieves an R-squared value of 0.849, indicating that approximately 84.9% of the variation in resale prices can be explained by the included predictor variables. The adjusted R-squared of 0.721 confirms strong explanatory power. The ANOVA table demonstrates the model's strong statistical significance with an F-statistic of 1078.706 and a p-value of 0.0000, providing robust evidence that the model as a whole is highly effective in explaining resale price variation.
-
-Among structural factors, floor_area_sqm emerges as the most influential predictor with a coefficient of $7,689 per square meter, followed closely by remaining_lease at $7,321 per year. Floor_level also shows a substantial positive effect of $6,802 per floor, indicating that unit size, lease duration, and floor height are the primary structural determinants of property value.
-For locational factors, distance to hawker centers shows the strongest impact with a coefficient of -$45.58 per meter, making it one of the most influential variables in the entire model. Distance to MRT stations (-$31.19 per meter) and distance to CBD (-$26.79 per meter) also demonstrate substantial effects, highlighting the critical importance of accessibility to food, transportation, and employment centers. Other significant distance variables include proximity to shopping areas, eldercare facilities, parks, and good primary schools.
-
-Among facility density variables, number of kindergartens within 350m stands out with the largest positive coefficient of $15,300 per additional kindergarten, reflecting strong demand from families with young children. Interestingly, several count variables show significant negative coefficients, including n_childcare_350m (-$3,906), n_preschool_350m (-$5,421), and n_schools_1km (-$3,621), suggesting that excessive facility density may have diminishing or even negative effects on property values.
+Overall, the model captures key structural and locational determinants of price, offering valuable insights for urban planning, valuation, and household decision-making.
 
 ## Multicollinearity Check
 
@@ -862,31 +834,7 @@ This code checks for multicollinearity in the regression model by calculating th
 ols_vif_tol(resale_mlr)
 ```
 
-The Variance Inflation Factor (VIF) values in the output are all below 5, which suggests that multicollinearity is not a significant issue in the model. Each predictor variable has a relatively low VIF, indicating minimal correlation with the other predictors. This means the model's coefficients are likely to be stable and reliable, with each variable contributing independently to the prediction of the resale price. 
-
-## Test for Non-Linearity
-
-The code below generates a residuals vs fitted values plot to check if the regression model satisfies the assumptions of linearity and constant variance (homoscedasticity).
-
-```{r}
-ols_plot_resid_fit(resale_mlr)
-```
-
-The plot shows residuals scattered around the horizontal zero line (red line) across the range of fitted values, which is a positive indication. The residuals appear to be randomly distributed above and below zero without any clear systematic pattern, suggesting that the linearity assumption is reasonably satisfied. However, there is a notable funnel-shaped pattern in the plot, where the spread of residuals appears to increase as the fitted values increase. This pattern is most evident at higher fitted values (above $1,000,000), where the residuals show greater variability and spread both upward and downward more dramatically than at lower price ranges.
-
-This funnel shape indicates heteroscedasticity - the variance of residuals is not constant across all levels of fitted values. Specifically, the model's prediction errors are larger for higher-priced properties compared to lower-priced ones. This suggests that the model may be less precise when predicting prices for more expensive HDB units. The presence of some outliers is also visible, particularly several points with large positive and negative residuals (exceeding ±250,000), indicating properties whose actual prices deviate substantially from model predictions.Despite the heteroscedasticity concern, the overall pattern is not severe enough to invalidate the model. 
-
-## Test for Normality
-
-The code below plots a histogram of the residuals to check whether the errors follow a normal distribution.
-
-```{r}
-ols_plot_resid_hist(resale_mlr)
-```
-
-The histogram shows that the residuals are approximately normally distributed, with the majority of residuals centered around zero. The overall shape of the distribution closely follows the bell curve pattern of a normal distribution, which is a positive indication. The peak of the histogram aligns well with zero residuals, and the distribution appears relatively symmetric on both sides.
-
-However, the distribution shows slight positive skewness, with a longer tail extending toward positive residuals (right side) compared to the negative side. Additionally, the distribution appears slightly leptokurtic (more peaked than a normal distribution), with a higher concentration of residuals near zero than would be expected under perfect normality, and the presence of values in the extreme tails suggests some outliers.
+The Variance Inflation Factor (VIF) values in the output are all below 5, which suggests that multicollinearity is not a significant issue in the model. Each predictor variable has a relatively low VIF, indicating minimal correlation with the other predictors. This means the model's coefficients are likely to be stable and reliable, with each variable contributing independently to the prediction of the resale price.
 
 ## Test for Spatial Autocorrelation
 
@@ -910,9 +858,14 @@ tm_shape(resale_res) +
             main.title.size = 1,
             legend.position = c("right", "bottom"))  # Position legend at bottom right
 ```
+
 The map shows spatial patterns in the model’s residuals, suggesting potential spatial autocorrelation.
 
 To statistically confirm our observation of spatial autocorrelation, we’ll perform Moran’s I Test.
+
+H₀: The regression residuals are randomly distributed in space (no spatial autocorrelation).
+
+H₁: The regression residuals exhibit positive spatial autocorrelation.
 
 ```{r}
 resale_sp <- as_Spatial(resale_res)
@@ -923,8 +876,7 @@ nb_lw <- nb2listw(nb, style = 'W')
 lm.morantest(resale_mlr, nb_lw)
 ```
 
-The Global Moran's I test for residual spatial autocorrelation shows a p-value far below the alpha value of 0.05, so we reject the null hypothesis that the residuals are randomly distributed across space. The observed Moran's I statistic is approximately 0.340, which is substantially greater than the expected value of approximately -0.001 under spatial randomness. Since the observed Global Moran's I is positive and significantly greater than zero, we can infer that the residuals exhibit a spatially clustered distribution, with similar residual values (either positive or negative) tending to occur near each other. This indicates the presence of significant positive spatial autocorrelation.
-
+The Global Moran's I test for residual spatial autocorrelation shows a p-value far below the alpha value of 0.05, so we reject the null hypothesis that the residuals are randomly distributed across space. The observed Moran's I statistic is approximately 0.322, which is substantially greater than the expected value of approximately -0.001 under spatial randomness. Since the observed Global Moran's I is positive and significantly greater than zero, we can infer that the residuals exhibit a spatially clustered distribution, with similar residual values (either positive or negative) tending to occur near each other. This indicates the presence of significant positive spatial autocorrelation.
 
 # 7 Geographically Weighted Random Forest
 
@@ -941,7 +893,7 @@ hdb_resale_train_nogeo <- hdb_resale_train %>%
 
 ## Compute Optimum Bandwidth
 
-The code below computes the optimum adaptive bandwidth using cross-validation to achieve the best local model performance.
+The code below computes the optimum adaptive bandwidth using cross-validation to achieve the best local model performance.Since both GWR and GWRF are geographically weighted methods that define local neighborhoods through bandwidth selection, the cross-validation approach in bw.gwr() provides a computationally efficient and statistically sound starting point for GWRF.
 
 ```{r}
 #| eval: false
@@ -959,7 +911,7 @@ bw_adaptive <- bw.gwr(
     n_kindergartens_350m +
     n_bus_350m +
     n_preschool_350m +
-    n_schools_1km +
+    n_primary_1km +
     floor_area_sqm +
     floor_level +
     remaining_lease,
@@ -985,9 +937,9 @@ bw_adaptive <- read_rds("data/model/bw_adaptive.rds")
 bw_adaptive
 ```
 
-The optimal bandwidth for this dataset is 31.
+The optimal bandwidth for this dataset is 53.
 
-##  Calibrate Geographically Weighted Random Forest Model
+## Calibrate Geographically Weighted Random Forest Model
 
 The code below calibrates a Geographically Weighted Random Forest model to predict HDB resale prices using the following predictors: distance to CBD (dist_cbd), distance to the nearest eldercare centre (dist_eldercare), distance to hawker/food centres (dist_hawker), distance to MRT station (dist_mrt), distance to parks (dist_parks), distance to good primary schools (dist_goodps), distance to shopping malls (dist_shopping), distance to supermarkets (dist_supermarkets), distance to clinics (dist_clinics), number of kindergartens within 350 m (n_kindergartens_350m), number of bus stops within 350 m (n_bus_350m), number of preschools within 350 m (n_preschool_350m), number of schools within 1 km (n_schools_1km), floor area in square meters (floor_area_sqm), floor level of the unit (floor_level), and remaining lease in years (remaining_lease). The model incorporates spatial coordinates and uses the optimal adaptive bandwidth (bw_adaptive) to account for spatial non-stationarity in feature importance and predictions.
 
@@ -1009,7 +961,7 @@ gwRF_adaptive <- grf(
     n_kindergartens_350m +
     n_bus_350m +
     n_preschool_350m +
-    n_schools_1km +
+    n_primary_1km +
     floor_area_sqm +
     floor_level +
     remaining_lease,
@@ -1036,17 +988,73 @@ variable_importance <- gwRF_adaptive$Global.Model$variable.importance
 sort(variable_importance, decreasing = TRUE)
 ```
 
-The variable importance analysis reveals the relative contribution of each predictor to the GWRF model's performance. Distance to CBD (dist_cbd) emerges as the most influential variable with an importance score of 9.79×10¹³, followed closely by remaining_lease_mths at 7.02×10¹³, confirming that central location and lease duration are the dominant drivers of HDB resale prices. 
+The variable importance analysis from the Geographically Weighted Random Forest (GWRF) model highlights the relative contribution of each predictor to model performance. Distance to CBD (dist_cbd) remains the most influential feature with an importance score of 9.79×10¹³, reaffirming the premium placed on centrality in HDB resale pricing. This is followed by remaining lease in months (remaining_lease_mths) at 7.02×10¹³, confirming the strong influence of lease duration on valuation.
 
-Mid-tier predictors include storey_mean (2.85×10¹³), dist_good_primary (2.34×10¹³), floor_area_sqm (1.08×10¹³), and dist_mrt (9.92×10¹²), highlighting the continued importance of floor level, school proximity, unit size, and transportation access. Distance variables to other amenities such as eldercare, hawker centers, parks, shopping malls, and supermarkets show moderate importance scores ranging from 3.37×10¹² to 8.29×10¹². The facility count variables (n_kindergartens_350m, n_childcare_350m, n_bus_350m, n_schools_1km) exhibit relatively lower importance scores between 1.26×10¹² and 3.37×10¹², suggesting that proximity to amenities matters more than facility density in determining property values. 
+The next tier of important predictors includes storey_mean (2.85×10¹³), distance to good primary schools (dist_good_primary, 2.34×10¹³), floor area (floor_area_sqm, 1.08×10¹³), and distance to MRT stations (dist_mrt, 9.92×10¹²). These variables emphasize the value buyers place on higher floor levels, educational access, larger units, and connectivity to transit.
 
-These rankings align with MLR findings while demonstrating that both structural characteristics and strategic location with good accessibility to key amenities are crucial determinants of HDB resale prices in Singapore's property market.
+Moderate importance is observed for other proximity-based variables such as distance to eldercare (8.29×10¹²), hawker centres (6.83×10¹²), parks (6.57×10¹²), shopping malls (5.46×10¹²), and supermarkets (3.37×10¹²), suggesting that accessibility to lifestyle and care amenities significantly contributes to perceived value.
 
+At the lower end are facility density variables, including number of kindergartens, childcare centres, bus stops within 350m, and schools within 1km, with scores ranging from 1.26×10¹² to 3.37×10¹². These results suggest that proximity to amenities has a stronger influence on pricing than the sheer number of nearby facilities, aligning with previous MLR findings and underscoring the role of both spatial location and structural features in shaping resale value.
 
-# 8 Model Evaluation
+# 8 Geographically Weighted Regression
+
+## Calibrate Geographically Weighted Regression Model
+
+The code below fits an adaptive-bandwidth Geographically Weighted Regression (GWR) model for HDB resale prices using spatial predictors, then saves the fitted model as an RDS file for later use.
+
+```{r}
+#| eval: false
+#| output: false
+gwr_adaptive <- gwr.basic(
+  formula = resale_price ~ 
+    dist_cbd +
+    dist_eldercare +
+    dist_hawker +
+    dist_mrt +
+    dist_parks +
+    dist_goodps +
+    dist_shopping +
+    dist_supermarkets +
+    n_kindergartens_350m +
+    n_bus_350m +
+    n_preschool_350m +
+    n_primary_1km +
+    floor_area_sqm +
+    floor_level +
+    remaining_lease,
+  data    = resale_sp,
+  bw      = bw_adaptive, 
+  kernel  = "gaussian",
+  adaptive = TRUE,
+  longlat = FALSE
+)
+
+write_rds(gwr_adaptive, "data/model/gwr_adaptive.rds")
+```
+
+```{r}
+#| echo: false
+gwr_adaptive <- read_rds("data/model/gwr_adaptive.rds")
+```
+
+```{r}
+gwr_adaptive
+resale_sp$gwr_pred  <- gwr_adaptive$SDF$pred     
+resale_sp$gwr_resid <- gwr_adaptive$SDF$gwr.e  
+```
+
+The Geographically Weighted Regression (GWR) model delivers a substantial improvement over the global regression, achieving an R-squared of 0.941, compared to 0.730 from the global model. This represents an additional 21% of explained variation, confirming the presence of strong spatial non-stationarity in the determinants of HDB resale prices. In other words, the influence of predictors such as accessibility, amenities, and physical attributes varies meaningfully across different neighbourhoods in Singapore.
+
+The model uses an adaptive bandwidth of 53 nearest neighbours with a Gaussian kernel. This bandwidth is large enough to ensure stable estimation of the 15 predictors, while remaining small enough to preserve local specificity. Such a bandwidth is consistent with recommendations in GWR literature for datasets of this size.
+
+The GWR coefficient summary reveals notable spatial variation in predictor effects. For example, the coefficient for distance to the CBD ranges from approximately –72 to –86, indicating that the price penalty for being farther from the CBD differs across locations. Similarly, the floor area premium ranges from –14,550 to +70,720, reflecting how the value of larger flats varies between mature estates and newer towns. These variations illustrate how GWR successfully captures geographically varying housing market dynamics that a single global model cannot represent.
+
+Model diagnostics highlight the complexity inherent in GWR. The effective number of parameters is approximately 878, far larger than the 15 parameters of the global model, resulting in a corresponding reduction of effective degrees of freedom to 5386. Despite this complexity, the adjusted R-squared remains high at 0.931, indicating that the improved fit is not merely due to overfitting. The AICc value of 150,292 provides an appropriate complexity-penalized benchmark for comparing GWR against alternative spatial models.
+
+# 9 Model Evaluation
 
 We will evaluate the models we calibrated earlier (Multiple Linear Regression and Geographically Weighted Random Forest).
- 
+
 ## Prepare Test Data
 
 The code below extracts the spatial coordinates and removes geometry from the HDB resale test dataset to prepare it for prediction using the GWRF model.
@@ -1108,6 +1116,53 @@ write_rds(hdb_resale_test, "data/rds/hdb_resale_test.rds")
 hdb_resale_test <- read_rds("data/rds/hdb_resale_test.rds")
 ```
 
+The code below uses the Geographically Weighted Linear Regression to make predictions.
+
+```{r}
+#| eval: false
+#| output: false
+coords_test <- st_coordinates(hdb_resale_test)
+resale_sp_test <- as_Spatial(hdb_resale_test)
+
+predictions_gwr <- gwr.predict(
+  formula = resale_price ~ 
+    dist_cbd +
+    dist_eldercare +
+    dist_hawker +
+    dist_mrt +
+    dist_parks +
+    dist_goodps +
+    dist_shopping +
+    dist_supermarkets +
+    n_kindergartens_350m +
+    n_bus_350m +
+    n_preschool_350m +
+    n_primary_1km +
+    floor_area_sqm +
+    floor_level +
+    remaining_lease,
+  data = resale_sp_test,
+  predictdata = resale_sp_test,
+  bw = bw_adaptive,
+  kernel = "gaussian",
+  adaptive = TRUE,
+  longlat = FALSE
+)
+
+hdb_resale_test$PREDICT_GWR <- predictions_gwr$SDF$prediction
+
+
+write_rds(predictions_gwr, "data/rds/predictions_gwr.rds")
+
+write_rds(hdb_resale_test, "data/rds/hdb_resale_test.rds")
+```
+
+```{r}
+#| echo: false
+predictions_gwr <- read_rds("data/rds/predictions_gwr.rds")
+hdb_resale_test <- read_rds("data/rds/hdb_resale_test.rds")
+```
+
 ## Calculate Root Mean Square Error (RMSE)
 
 The code below calculates the Root Mean Square Error (RMSE) of the Multiple Linear Regression and Geographically Weighted Random Forest models.
@@ -1115,21 +1170,24 @@ The code below calculates the Root Mean Square Error (RMSE) of the Multiple Line
 ```{r}
 MLR_RMSE <- rmse(hdb_resale_test$resale_price, hdb_resale_test$PREDICT_MLR)
 gwRF_RMSE <- rmse(hdb_resale_test$resale_price, hdb_resale_test$PREDICT_GWRF)
+GWR_RMSE  <- rmse(hdb_resale_test$resale_price, hdb_resale_test$PREDICT_GWR)
 
 RMSE_results <- data.frame(
-  Model = c("Multiple Linear Regression", "Geographically Weighted Random Forest"),
-  RMSE = c(MLR_RMSE, gwRF_RMSE))
+  Model = c("Multiple Linear Regression", "Geographically Weighted Random Forest", "Geographically Weighted Regression"),
+  RMSE = c(MLR_RMSE, gwRF_RMSE, GWR_RMSE))
 
 knitr::kable(RMSE_results, caption = "RMSE Comparison of Model Predictions")
 ```
 
-The results show that the MLR model (RMSE = 91,712.95) outperforms the gwRF model (RMSE = 178,801.53) on the test dataset. This suggests that, in this case, the simpler global linear model provides more stable and accurate predictions than the spatially adaptive gwRF, possibly because the spatial heterogeneity in the dataset is not strong enough to justify the additional model complexity of gwRF, or the gwRF model may be overfitting to local patterns in the training data that do not generalize well to the test period.
+The results indicate that Geographically Weighted Regression (GWR) achieves the lowest prediction error (RMSE = 46,448.19), outperforming both the Multiple Linear Regression model (RMSE = 90,545.65) and the Geographically Weighted Random Forest model (RMSE = 178,805.25). This suggests that incorporating spatially varying coefficients through GWR is highly effective for this dataset, capturing local price dynamics that global models cannot.
 
-##  Model Predictions Visualization
+In contrast, the MLR model, despite being a simple global model, performs moderately well and substantially better than gwRF. The relatively strong performance of MLR implies that a significant portion of price variation can still be explained by global linear relationships without requiring complex spatial interactions.The gwRF model, however, performs the worst, indicating potential overfitting to local training patterns or insufficient spatial heterogeneity to justify its high model flexibility.
+
+## Model Predictions Visualization
 
 The code below visualizes the prediction performance of both models by plotting actual resale prices against predicted prices.
 
-```{r}
+```{r fig.height = 8, fig.width=14}
 plot_mlr <- ggplot(data = hdb_resale_test,
                    aes(x = PREDICT_MLR,
                        y = resale_price)) +
@@ -1144,94 +1202,74 @@ plot_gwrf <- ggplot(data = hdb_resale_test,
   ggtitle("Resale Price vs Predicted Price (GWRF)") +
   theme(plot.title = element_text(size = 10)) 
 
-ggarrange(plot_mlr, plot_gwrf, ncol = 2)
+
+plot_gwr <- ggplot(data = hdb_resale_test,
+                   aes(x = PREDICT_GWR,
+                       y = resale_price)) +
+  geom_point() + 
+  ggtitle("Resale Price vs Predicted Price (GWR)") +
+  theme(plot.title = element_text(size = 10))
+
+
+ggarrange(plot_mlr, plot_gwrf, plot_gwr, ncol = 3)
 ```
 
-Both the MLR and GWRF models show strong linear relationships between predicted and actual prices, with points clustering closely around the diagonal trend. However, the MLR plot (left) demonstrates a tighter, more consistent clustering pattern along the diagonal, indicating more accurate and stable predictions across the entire price range. The GWRF plot (right) shows slightly more scatter and dispersion, particularly at higher price points above $1,200,000, where several predictions deviate noticeably from actual values. This visual pattern confirms the RMSE results, where MLR achieved lower prediction error.
+The scatterplots reveal clear differences in predictive performance among the three models. GWR (right) exhibits the strongest alignment between predicted and actual resale prices, with points clustering most tightly along the diagonal across the entire price spectrum. This visual pattern corresponds to its lowest RMSE and indicates that GWR captures spatially varying price relationships effectively, yielding highly accurate and well-calibrated predictions.
 
-Both models appear to perform well for properties in the $600,000 to $1,000,000 range, where the majority of transactions occur and where the point density is highest. However, for extreme values at both the lower end (below $600,000) and upper end (above $1,200,000), both models show increased variability, though MLR maintains better consistency. The visualization reinforces that while the GWRF model's spatial complexity should theoretically improve predictions, in this particular case, the simpler MLR approach delivers superior and more reliable predictive performance across the test dataset.
+The MLR model (left) also shows a strong linear relationship, with most points concentrated around the diagonal. However, compared to GWR, the spread is wider and deviations from the trend line become more noticeable at higher price levels (above approximately \$1,200,000). This suggests that while MLR performs reasonably well—especially in the dominant \$600,000–\$1,000,000 transaction range—it lacks the spatial flexibility to fully capture localized price variations.
+
+In contrast, the gwRF model (middle) shows the greatest scatter and the weakest alignment with the diagonal, particularly in the upper price range. Several predictions deviate substantially from actual values, reflecting inconsistent performance and greater prediction error. This visual behavior aligns with gwRF's much higher RMSE and indicates probable overfitting to local patterns that do not generalize well to the test dataset.
 
 ## Visualization of Model Residuals
 
-The code below calculates the residuals of both models, and visualizes them on a map to compare where each model overestimates or underestimates HDB resale prices across Singapore.
+The code below calculates the residuals of best model(Geographically Weighted Regression), and visualizes them on a map.
 
 ```{r}
-## Visualization of Model Residuals
-
-# Calculate residuals for both models
 hdb_resale_test <- hdb_resale_test %>%
-  mutate(
-    MLR_RES = resale_price - PREDICT_MLR,
-    GWRF_RES = resale_price - PREDICT_GWRF
-  )
+  mutate(GWR_RES = resale_price - PREDICT_GWR)
 
-# Define common breaks for consistent color scaling
 common_breaks <- c(-Inf, seq(-400000, 400000, by = 100000), Inf)
 
-# Create base map with borders
 base_map <- tm_shape(mpsz) +
   tm_polygons(col = "white", border.col = "gray70", border.alpha = 0.5)
 
-# Create MLR residuals map
-mlr_res_map <- base_map +
-  tm_shape(hdb_resale_test) +
-  tm_dots(
-    col = "MLR_RES",
-    breaks = common_breaks,
-    palette = "-RdBu",
-    size = 0.2,
-    alpha = 0.7,
-    border.col = "black",
-    border.lwd = 0.5,
-    border.alpha = 0.3,
-    title = "MLR Residuals ($)"  # Add title for MLR legend
-  ) +
-  tm_layout(
-    main.title = "Multiple Linear Regression Residuals",
-    main.title.size = 1,
-    legend.outside = TRUE,  # Place legend outside
-    legend.outside.position = "right"  # Position on right
-  )
-
-# Create GWRF residuals map
 gwrf_res_map <- base_map +
   tm_shape(hdb_resale_test) +
   tm_dots(
-    col = "GWRF_RES",
+    col = "GWR_RES",
     breaks = common_breaks,
     palette = "-RdBu",
-    size = 0.2,
+    size = 0.25,
     alpha = 0.7,
     border.col = "black",
     border.lwd = 0.5,
     border.alpha = 0.3,
-    title = "GWRF Residuals ($)"  # Add title for GWRF legend
-  ) +
+    title = "GWR Residuals ($)") +
   tm_layout(
-    main.title = "Geographically Weighted Random Forest Residuals",
+    main.title = "Geographically Weighted Regression Residuals",
     main.title.size = 1,
-    legend.outside = TRUE,  # Place legend outside
-    legend.outside.position = "right"  # Position on right
-  )
+    legend.outside = TRUE,
+    legend.outside.position = "right")
 
-# Set to plot mode for static visualization
 tmap_mode("plot")
 
-# Arrange both maps side by side
-tmap_arrange(mlr_res_map, gwrf_res_map, ncol = 2)
+gwrf_res_map
 ```
 
-The spatial distribution of residuals reveals important patterns in model performance across different areas of Singapore, where red indicates over-prediction (model predicts higher than actual price) and blue indicates under-prediction (model predicts lower than actual price), with neutral colors representing accurate predictions near zero error.
+The spatial distribution of GWR residuals illustrates how well the model captures local housing price dynamics across Singapore. Red indicates over-prediction (model predicts higher than actual price), blue indicates under-prediction, and lighter tones represent predictions close to the true values.
 
-The MLR residuals map (left) shows a relatively balanced spatial pattern with both red and blue dots distributed across various regions. However, there appears to be some clustering of positive residuals (over-predictions) in certain central and northeastern areas, while negative residuals (under-predictions) are visible in scattered locations. This pattern suggests that the global linear model may struggle to capture local price variations in specific neighborhoods.
+Overall, the GWR residual map shows mostly light-colored points, indicating that prediction errors are generally small and well-controlled across the island—consistent with GWR’s strong RMSE performance. The residuals do not form large, contiguous clusters, suggesting that the model successfully accounts for much of the spatial heterogeneity in resale prices.
 
-The GWRF residuals map (right) displays more pronounced clusters of large residuals, particularly evident in the central region where dark red dots indicate substantial over-predictions exceeding $400,000. The GWRF model shows more extreme prediction errors concentrated in specific areas, especially for higher-priced properties in central locations. This clustering pattern suggests that despite the model's spatial flexibility, it is overfitting to local training data patterns that don't generalize well to the test period, resulting in larger and more spatially concentrated errors compared to the simpler MLR approach. The concentration of large errors in premium neighborhoods indicates that the GWRF model may be particularly sensitive to temporal market changes in high-value areas, where prices can fluctuate more dramatically between training and test periods.
+However, some localized patterns remain. Mild under-predictions (light blue) appear in parts of the northeast and eastern regions, suggesting that actual prices in those neighborhoods are slightly higher than what the model expects. Conversely, small pockets of over-prediction (light to medium red) are visible in selected central and northwestern subzones, possibly reflecting micro-market premiums or recent price movements not fully captured by the training data.
+
+Notably, the map lacks the large, concentrated errors seen in more rigid global models or overly complex spatial models. GWR avoids extreme residuals (very deep blue or red), demonstrating that its spatially varying coefficients adapt well to neighborhood-level market conditions. The absence of strong spatial clustering of errors further confirms that GWR provides stable, geographically consistent prediction performance, reinforcing why it achieved the lowest RMSE among the three models.
 
 # 9 Conclusion
 
-The findings indicate a distinctly right-skewed distribution of 5-room HDB resale prices and a strong spatial gradient: high values concentrate in central, mature towns with superior accessibility, while lower values are more common in peripheral estates. Across methods, the same value drivers emerge. Structurally, larger floor area, longer remaining lease, and higher floor level consistently command price premiums. Locationally, proximity to hawker centres, MRT stations, and the CBD exhibits clear capitalization effects—each meter closer is associated with higher prices.
+The analysis reveals a distinctly right-skewed distribution of 5-room HDB resale prices and a clear spatial gradient: most transactions cluster between \$600,000 and \$800,000, with high-value sales above \$1 million concentrated in central and mature towns such as Queenstown, Bukit Merah, Kallang/Whampoa and Bishan, while lower prices dominate in peripheral estates like Sembawang, Yishun, Woodlands and Punggol. Across all models, the same core value drivers emerge. Structurally, larger floor area, longer remaining lease and higher floor level consistently command substantial premiums. Locationally, proximity to the CBD, MRT stations, hawker centres, parks, shopping malls and top primary schools exhibits strong capitalization effects, confirming that accessibility to employment, transit and amenities is deeply embedded in HDB pricing.
 
-When evaluated out-of-sample, the parsimonious Multiple Linear Regression (MLR) generalizes better than the Geographically Weighted Random Forest (GWRF), achieving a substantially lower RMSE (~91.7k vs. ~178.8k). Diagnostics suggest two caveats: heteroscedasticity (errors increase for expensive units) and significant positive spatial autocorrelation in residuals, implying spatial effects remain partially unmodeled.
+Out-of-sample evaluation shows a clear ranking among the three modelling approaches. Geographically Weighted Regression (GWR) achieves the lowest prediction error (RMSE ≈ \$46,448), substantially outperforming the global Multiple Linear Regression (RMSE ≈ \$90,546) and the Geographically Weighted Random Forest (RMSE ≈ \$178,805). Scatterplots of predicted versus actual prices and the GWR residual map confirm this: GWR predictions align most closely with the 45-degree line and residuals are generally small, with limited spatial clustering. In contrast, while the parsimonious MLR still performs reasonably well and demonstrates that a large share of price variation can be captured by global linear relationships, its residuals exhibit significant positive spatial autocorrelation, indicating unmodeled spatial processes. The GWRF model performs worst, with highly scattered predictions and pockets of large errors, suggesting overfitting to local training patterns without corresponding gains in generalization.
 
-This study is constrained by a short test window, Euclidean (not network) distances, possible geocoding inaccuracies, and unmodeled temporal dynamics such as policy or market shocks. Overall, a well-specified hedonic MLR offers strong, interpretable performance.
+GWR diagnostics further highlight meaningful spatial non-stationarity. The model attains an R² of about 0.94 (adjusted R² ≈ 0.93), and local coefficients show substantial geographic variation—for example, the price penalty of distance to the CBD and the premium for additional floor area differ markedly across neighbourhoods, reflecting heterogeneous sub-markets between mature central estates and newer peripheral towns. Although this flexibility comes at the cost of a high effective parameter count and reduced degrees of freedom, the strong adjusted R² and improved residual behaviour suggest that the additional complexity captures genuine spatial structure rather than mere noise.
 
+This study remains constrained by a short evaluation window, reliance on Euclidean rather than network distances, potential geocoding inaccuracies, and limited treatment of temporal effects such as policy changes or market shocks. Future work could extend the time horizon, incorporate network-based accessibility measures, explore spatio-temporal or multilevel models, and refine spatial machine-learning approaches. Nonetheless, the results demonstrate that while a well-specified global hedonic MLR provides a solid baseline, Geographically Weighted Regression offers the best balance of interpretability and predictive accuracy by explicitly modelling the spatially varying nature of Singapore’s HDB resale market.
