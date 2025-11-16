@@ -125,12 +125,15 @@ village <- village %>%
 ```{r}
 any(is.na(village$H_CNT))
 ```
+
 ```{r}
 any(is.na(village$P_CNT))
 ```
+
 ```{r}
 any(is.na(village$M_CNT))
 ```
+
 ```{r}
 any(is.na(village$F_CNT))
 ```
@@ -193,6 +196,7 @@ market_share <- huff_share %>%
 Trade_area <- village %>%
   left_join(market_share)
 ```
+
 ```{r}
 selected_store <- stores %>%
   filter(Store_CD == "TG")
@@ -221,7 +225,7 @@ tm_shape(Trade_area) +
   tm_grid(alpha =0.2) 
 ```
 
-##  Store sales analysis
+## Store sales analysis
 
 ```{r}
 huff_share_pp <- huff_share %>%
@@ -261,19 +265,3 @@ huff_share_wider <- huff_share %>%
     pivot_wider(names_from = Store_CD, 
                 values_from = p_ij)
 ```
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
